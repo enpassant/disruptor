@@ -29,6 +29,9 @@ class Disruptor extends Actor with ActorLogging {
       }
       log.info(cs mkString ",")
       context.become(process(cs))
+
+    case GetState if log.isDebugEnabled =>
+      sender ! consumers
   }
 
   def process(consumers: Vector[List[Consumer]]): Receive = {
@@ -67,6 +70,7 @@ class Disruptor extends Actor with ActorLogging {
 object Disruptor {
   val props = Props[Disruptor]
 
+  case object GetState
   case object Initialized
   case class Consumer(order: Int, actorPath: String) {
     var index = 0
