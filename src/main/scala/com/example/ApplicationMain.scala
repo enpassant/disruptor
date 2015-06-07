@@ -19,13 +19,13 @@ object ApplicationMain extends App {
   disruptor ! Consumer(2, "/user/pongActor")
 
   disruptor ! Initialized
-  disruptor ! Event(PingMessage("ping1"))
-  disruptor ! Event(PingMessage("ping2"))
-  disruptor ! Event(PingMessage("ping3"))
-  disruptor ! Event(PingMessage("ping4"))
-  disruptor ! Event(PingMessage("ping5"))
-  disruptor ! Event(PingMessage("ping6"))
-  disruptor ! Event(PingMessage("ping7"))
+  disruptor ! Event("1", PingMessage("ping1"))
+  disruptor ! Event("2", PingMessage("ping2"))
+  disruptor ! Event("3", PingMessage("ping3"))
+  disruptor ! Event("4", PingMessage("ping4"))
+  disruptor ! Event("5", PingMessage("ping5"))
+  disruptor ! Event("6", PingMessage("ping6"))
+  disruptor ! Event("7", PingMessage("ping7"))
 
   Thread.sleep(3000)
 

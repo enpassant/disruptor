@@ -73,7 +73,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       disruptor ! Initialized
       val data = "Test"
-      disruptor ! Event(data)
+      disruptor ! Event("1", data)
 
       probe1.expectMsg(500.millis, Process(path1, data))
     }
@@ -86,7 +86,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       disruptor ! Initialized
       val data = "Test"
-      disruptor ! Event(data)
+      disruptor ! Event("1", data)
 
       probe1.expectMsg(100.millis, Process(path1, data))
       probe2.expectMsg(100.millis, Process(path2, data))
@@ -101,7 +101,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       disruptor ! Initialized
       val data = "Test"
-      disruptor ! Event(data)
+      disruptor ! Event("1", data)
 
       probe1.expectMsg(100.millis, Process(path1, data))
       probe2.expectMsg(100.millis, Process(path2, data))
@@ -117,7 +117,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       disruptor ! Initialized
       val data = "Test"
-      disruptor ! Event(data)
+      disruptor ! Event("1", data)
 
       probe1.expectMsg(100.millis, Process(path1, data))
       probe2.expectMsg(100.millis, Process(path2, data))
@@ -134,7 +134,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       disruptor ! Initialized
       val data = "Test"
-      disruptor ! Event(data)
+      disruptor ! Event("1", data)
 
       probe1.expectMsg(100.millis, Process(path1, data))
       probe2.expectMsg(100.millis, Process(path2, data))

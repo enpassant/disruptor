@@ -1,11 +1,11 @@
 package com.example
 
-import akka.actor.{Actor, ActorLogging, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 
 class Disruptor(bufSize: Int) extends Actor with ActorLogging {
   import Disruptor._
 
-  val buffer = new Array[Any](bufSize)
+  val buffer = new Array[BufferItem](bufSize)
   var indexes = Array.empty[Int]
 
   def receive = initialize(Array(Consumer(0, "")))
@@ -34,14 +34,15 @@ class Disruptor(bufSize: Int) extends Actor with ActorLogging {
   }
 
   def process(consumers: Vector[List[Consumer]]): Receive = {
-    case Event(data) if (indexes.head + 1) % bufSize != indexes.last =>
-      buffer(indexes.head) = data
+    case Event(id, data) if (indexes.head + 1) % bufSize != indexes.last =>
+      buffer(indexes.head) = BufferItem(sender, id, data)
       indexes(0) = (indexes.head + 1) % bufSize
       log.info(data.toString)
       step(1, consumers)
 
-    case Event(data) =>
+    case Event(id, data) =>
       log.info(s"The event buffer is full! The $data is dropped.")
+      sender ! Busy(id)
 
     case Processed(id) =>
       log.info(s"Received processed message: $id")
@@ -58,7 +59,7 @@ class Disruptor(bufSize: Int) extends Actor with ActorLogging {
           else (cIndex until prevIndex)
         range.foreach { i =>
           val idx = i % bufSize
-          context.actorSelection(consumer.actorPath) ! Process(consumer.actorPath, buffer(idx))
+          context.actorSelection(consumer.actorPath) ! Process(consumer.actorPath, buffer(idx).data)
         }
       }
     }
@@ -74,8 +75,10 @@ object Disruptor {
   case class Consumer(order: Int, actorPath: String) {
     var index = 0
   }
-  case class Event(data: Any)
+  case class Event(id: String, data: Any)
   case class Process(id: String, data: Any)
   case class Processed(id: String)
+  case class Busy(id: String)
+  case class BufferItem(sender: ActorRef, id: String, data: Any)
 }
 
