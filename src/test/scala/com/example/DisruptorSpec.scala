@@ -23,7 +23,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
   "A Disruptor actor" must {
     "ordering Consumers" in {
-      val disruptor = system.actorOf(Disruptor.props)
+      val disruptor = system.actorOf(Disruptor.props(8))
 
       def checkOrder(expectResult: Array[Disruptor.Consumer]) = {
           disruptor ! Disruptor.GetState
@@ -60,7 +60,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
   "A Disruptor actor" must {
     "receive an event and send to process" in {
-      val disruptor = system.actorOf(Disruptor.props)
+      val disruptor = system.actorOf(Disruptor.props(8))
 
       val probe1 = TestProbe()
       val path1 = "/" + (probe1.ref.path.elements mkString "/")

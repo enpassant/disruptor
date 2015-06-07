@@ -7,7 +7,7 @@ import PingActor._
 object ApplicationMain extends App {
   val system = ActorSystem("MyActorSystem")
 
-  val disruptor = system.actorOf(Disruptor.props, "disruptor")
+  val disruptor = system.actorOf(Disruptor.props(16), "disruptor")
   val pingActor1 = system.actorOf(PingActor.props, "pingActor1")
   val pingActor2 = system.actorOf(PingActor.props, "pingActor2")
   val pingActor3 = system.actorOf(PingActor.props, "pingActor3")

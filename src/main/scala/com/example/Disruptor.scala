@@ -2,11 +2,10 @@ package com.example
 
 import akka.actor.{Actor, ActorLogging, Props}
 
-class Disruptor extends Actor with ActorLogging {
+class Disruptor(bufSize: Int) extends Actor with ActorLogging {
   import Disruptor._
 
-  final val BufSize = 4
-  val buffer = new Array[Any](BufSize)
+  val buffer = new Array[Any](bufSize)
   var indexes = Array.empty[Int]
 
   def receive = initialize(Array(Consumer(0, "")))
@@ -35,9 +34,9 @@ class Disruptor extends Actor with ActorLogging {
   }
 
   def process(consumers: Vector[List[Consumer]]): Receive = {
-    case Event(data) if (indexes.head + 1) % BufSize != indexes.last =>
+    case Event(data) if (indexes.head + 1) % bufSize != indexes.last =>
       buffer(indexes.head) = data
-      indexes(0) = (indexes.head + 1) % BufSize
+      indexes(0) = (indexes.head + 1) % bufSize
       log.info(data.toString)
       step(1, consumers)
 
@@ -55,10 +54,10 @@ class Disruptor extends Actor with ActorLogging {
       val cIndex = consumer.index
       val dif = cIndex - prevIndex
       if (dif != 0) {
-        val range = if (dif > 0) (cIndex until (prevIndex + BufSize))
+        val range = if (dif > 0) (cIndex until (prevIndex + bufSize))
           else (cIndex until prevIndex)
         range.foreach { i =>
-          val idx = i % BufSize
+          val idx = i % bufSize
           context.actorSelection(consumer.actorPath) ! Process(consumer.actorPath, buffer(idx))
         }
       }
@@ -68,7 +67,7 @@ class Disruptor extends Actor with ActorLogging {
 }
 
 object Disruptor {
-  val props = Props[Disruptor]
+  def props(bufSize: Int) = Props(new Disruptor(bufSize))
 
   case object GetState
   case object Initialized
