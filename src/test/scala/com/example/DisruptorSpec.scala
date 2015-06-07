@@ -12,6 +12,8 @@ import scala.concurrent.Await
 import akka.pattern.ask
 import scala.util.Success
 
+import Disruptor._
+
 class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll {
 
@@ -23,54 +25,95 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
   "A Disruptor actor" must {
     "ordering Consumers" in {
-      val disruptor = system.actorOf(Disruptor.props(8))
+      val disruptor = system.actorOf(props(8))
 
-      def checkOrder(expectResult: Array[Disruptor.Consumer]) = {
-          disruptor ! Disruptor.GetState
+      def checkOrder(expectResult: Array[Consumer]) = {
+          disruptor ! GetState
           val result = receiveOne(10.millis)
           result should be(expectResult)
       }
 
-      val consumer1 = Disruptor.Consumer(1, "/user/PingActor1")
-      val consumer2 = Disruptor.Consumer(2, "/user/PingActor2")
-      val consumer3 = Disruptor.Consumer(3, "/user/PingActor3")
-      val consumer4 = Disruptor.Consumer(4, "/user/PingActor4")
-      val consumer5 = Disruptor.Consumer(5, "/user/PingActor5")
-      val consumer6 = Disruptor.Consumer(6, "/user/PingActor6")
+      val consumer1 = Consumer(1, "/user/PingActor1")
+      val consumer2 = Consumer(2, "/user/PingActor2")
+      val consumer3 = Consumer(3, "/user/PingActor3")
+      val consumer4 = Consumer(4, "/user/PingActor4")
+      val consumer5 = Consumer(5, "/user/PingActor5")
+      val consumer6 = Consumer(6, "/user/PingActor6")
 
       disruptor ! consumer6
-      checkOrder(Array(Disruptor.Consumer(0, ""), consumer6))
+      checkOrder(Array(Consumer(0, ""), consumer6))
 
       disruptor ! consumer3
-      checkOrder(Array(Disruptor.Consumer(0, ""), consumer3, consumer6))
+      checkOrder(Array(Consumer(0, ""), consumer3, consumer6))
 
       disruptor ! consumer4
-      checkOrder(Array(Disruptor.Consumer(0, ""), consumer3, consumer4, consumer6))
+      checkOrder(Array(Consumer(0, ""), consumer3, consumer4, consumer6))
 
       disruptor ! consumer2
-      checkOrder(Array(Disruptor.Consumer(0, ""), consumer2, consumer3, consumer4, consumer6))
+      checkOrder(Array(Consumer(0, ""), consumer2, consumer3, consumer4, consumer6))
 
       disruptor ! consumer1
-      checkOrder(Array(Disruptor.Consumer(0, ""), consumer1, consumer2, consumer3, consumer4, consumer6))
+      checkOrder(Array(Consumer(0, ""), consumer1, consumer2, consumer3, consumer4, consumer6))
 
       disruptor ! consumer5
-      checkOrder(Array(Disruptor.Consumer(0, ""), consumer1, consumer2, consumer3, consumer4, consumer5, consumer6))
+      checkOrder(Array(Consumer(0, ""), consumer1, consumer2, consumer3, consumer4, consumer5, consumer6))
     }
-  }
 
-  "A Disruptor actor" must {
     "receive an event and send to process" in {
-      val disruptor = system.actorOf(Disruptor.props(8))
+      val disruptor = system.actorOf(props(8))
 
       val probe1 = TestProbe()
       val path1 = "/" + (probe1.ref.path.elements mkString "/")
-      disruptor ! Disruptor.Consumer(6, path1)
+      disruptor ! Consumer(6, path1)
 
-      disruptor ! Disruptor.Initialized
+      disruptor ! Initialized
       val data = "Test"
-      disruptor ! Disruptor.Event(data)
+      disruptor ! Event(data)
 
-      probe1.expectMsg(500.millis, Disruptor.Process(path1, data))
+      probe1.expectMsg(500.millis, Process(path1, data))
+    }
+
+    "send event to every independent consumers" in {
+      val disruptor = system.actorOf(props(8))
+
+      val probe1 = TestProbe()
+      val path1 = "/" + (probe1.ref.path.elements mkString "/")
+      disruptor ! Consumer(1, path1)
+
+      val probe2 = TestProbe()
+      val path2 = "/" + (probe2.ref.path.elements mkString "/")
+      disruptor ! Consumer(1, path2)
+
+      disruptor ! Initialized
+      val data = "Test"
+      disruptor ! Event(data)
+
+      probe1.expectMsg(100.millis, Process(path1, data))
+      probe2.expectMsg(100.millis, Process(path2, data))
+    }
+
+    "send event to every independent consumers and no others" in {
+      val disruptor = system.actorOf(props(8))
+
+      val probe1 = TestProbe()
+      val path1 = "/" + (probe1.ref.path.elements mkString "/")
+      disruptor ! Consumer(1, path1)
+
+      val probe2 = TestProbe()
+      val path2 = "/" + (probe2.ref.path.elements mkString "/")
+      disruptor ! Consumer(1, path2)
+
+      val probe3 = TestProbe()
+      val path3 = "/" + (probe3.ref.path.elements mkString "/")
+      disruptor ! Consumer(2, path3)
+
+      disruptor ! Initialized
+      val data = "Test"
+      disruptor ! Event(data)
+
+      probe1.expectMsg(100.millis, Process(path1, data))
+      probe2.expectMsg(100.millis, Process(path2, data))
+      probe3.expectNoMsg(100.millis)
     }
   }
 
