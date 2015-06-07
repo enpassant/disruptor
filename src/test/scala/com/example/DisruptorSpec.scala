@@ -1,7 +1,7 @@
 package com.example
 
 import akka.actor.ActorSystem
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef}
 import akka.actor.Props
 import akka.testkit.{ EventFilter, TestActorRef, TestActors, TestKit, TestProbe, ImplicitSender }
 import org.scalatest.WordSpecLike
@@ -21,6 +21,13 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)
+  }
+
+  def addTestProbeConsumer(disruptor: ActorRef, order: Int) = {
+    val probe = TestProbe()
+    val path = "/" + (probe.ref.path.elements mkString "/")
+    disruptor ! Consumer(order, path)
+    (probe, path)
   }
 
   "A Disruptor actor" must {
@@ -62,9 +69,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
     "receive an event and send to process" in {
       val disruptor = system.actorOf(props(8))
 
-      val probe1 = TestProbe()
-      val path1 = "/" + (probe1.ref.path.elements mkString "/")
-      disruptor ! Consumer(6, path1)
+      val (probe1, path1) = addTestProbeConsumer(disruptor, 6)
 
       disruptor ! Initialized
       val data = "Test"
@@ -76,13 +81,8 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
     "send event to every independent consumers" in {
       val disruptor = system.actorOf(props(8))
 
-      val probe1 = TestProbe()
-      val path1 = "/" + (probe1.ref.path.elements mkString "/")
-      disruptor ! Consumer(1, path1)
-
-      val probe2 = TestProbe()
-      val path2 = "/" + (probe2.ref.path.elements mkString "/")
-      disruptor ! Consumer(1, path2)
+      val (probe1, path1) = addTestProbeConsumer(disruptor, 1)
+      val (probe2, path2) = addTestProbeConsumer(disruptor, 1)
 
       disruptor ! Initialized
       val data = "Test"
@@ -95,17 +95,9 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
     "send event to every independent consumers and no others" in {
       val disruptor = system.actorOf(props(8))
 
-      val probe1 = TestProbe()
-      val path1 = "/" + (probe1.ref.path.elements mkString "/")
-      disruptor ! Consumer(1, path1)
-
-      val probe2 = TestProbe()
-      val path2 = "/" + (probe2.ref.path.elements mkString "/")
-      disruptor ! Consumer(1, path2)
-
-      val probe3 = TestProbe()
-      val path3 = "/" + (probe3.ref.path.elements mkString "/")
-      disruptor ! Consumer(2, path3)
+      val (probe1, path1) = addTestProbeConsumer(disruptor, 1)
+      val (probe2, path2) = addTestProbeConsumer(disruptor, 1)
+      val (probe3, path3) = addTestProbeConsumer(disruptor, 2)
 
       disruptor ! Initialized
       val data = "Test"
@@ -114,6 +106,41 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       probe1.expectMsg(100.millis, Process(path1, data))
       probe2.expectMsg(100.millis, Process(path2, data))
       probe3.expectNoMsg(100.millis)
+    }
+
+    "send event to every independent consumers and no others if only one processed" in {
+      val disruptor = system.actorOf(props(8))
+
+      val (probe1, path1) = addTestProbeConsumer(disruptor, 1)
+      val (probe2, path2) = addTestProbeConsumer(disruptor, 1)
+      val (probe3, path3) = addTestProbeConsumer(disruptor, 2)
+
+      disruptor ! Initialized
+      val data = "Test"
+      disruptor ! Event(data)
+
+      probe1.expectMsg(100.millis, Process(path1, data))
+      probe2.expectMsg(100.millis, Process(path2, data))
+      probe1.ref ! Processed(path1)
+      probe3.expectNoMsg(100.millis)
+    }
+
+    "send event to every independent consumers and when it processed send to next" in {
+      val disruptor = system.actorOf(props(8))
+
+      val (probe1, path1) = addTestProbeConsumer(disruptor, 1)
+      val (probe2, path2) = addTestProbeConsumer(disruptor, 1)
+      val (probe3, path3) = addTestProbeConsumer(disruptor, 2)
+
+      disruptor ! Initialized
+      val data = "Test"
+      disruptor ! Event(data)
+
+      probe1.expectMsg(100.millis, Process(path1, data))
+      probe2.expectMsg(100.millis, Process(path2, data))
+      probe1.ref ! Processed(path1)
+      probe2.ref ! Processed(path2)
+      probe3.expectMsg(100.millis, Process(path3, data))
     }
   }
 
