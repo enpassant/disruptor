@@ -6,7 +6,7 @@ class Disruptor(bufSize: Int) extends Actor with ActorLogging {
   import Disruptor._
 
   val buffer = new Array[BufferItem](bufSize)
-  var indexes = Array.empty[Int]
+  var indexes = Array.empty[Long]
 
   def receive = initialize(Array(Consumer(0, "")))
 
@@ -16,7 +16,7 @@ class Disruptor(bufSize: Int) extends Actor with ActorLogging {
 
     case Initialized =>
       val orders = consumers.map(_.order).toSet
-      indexes = new Array[Int](orders.size)
+      indexes = new Array[Long](orders.size)
       log.info(indexes mkString ",")
       val cs = consumers.tail.foldLeft(Vector(List(consumers.head))) {
         (a, c) => if (a.last.head.order != c.order) {
@@ -34,9 +34,9 @@ class Disruptor(bufSize: Int) extends Actor with ActorLogging {
   }
 
   def process(consumers: Vector[List[Consumer]]): Receive = {
-    case Event(id, data) if (indexes.head + 1) % bufSize != indexes.last =>
-      buffer(indexes.head) = BufferItem(sender, id, data)
-      indexes(0) = (indexes.head + 1) % bufSize
+    case Event(id, data) if (indexes.head - bufSize) < indexes.last =>
+      buffer((indexes.head % bufSize).toInt) = BufferItem(sender, id, data)
+      indexes(0) = indexes.head + 1
       log.info(data.toString)
       step(1, consumers)
 
@@ -54,16 +54,14 @@ class Disruptor(bufSize: Int) extends Actor with ActorLogging {
     consumers(index).foreach { consumer =>
       val cIndex = consumer.index
       val dif = cIndex - prevIndex
-      if (dif != 0) {
-        val range = if (dif > 0) (cIndex until (prevIndex + bufSize))
-          else (cIndex until prevIndex)
+      if (dif <= 0) {
+        val range = (cIndex until prevIndex)
         range.foreach { i =>
-          val idx = i % bufSize
+          val idx = (i % bufSize).toInt
           context.actorSelection(consumer.actorPath) ! Process(consumer.actorPath, buffer(idx).data)
         }
       }
     }
-    if (index < indexes.size - 1) step(index + 1, consumers)
   }
 }
 
@@ -73,7 +71,7 @@ object Disruptor {
   case object GetState
   case object Initialized
   case class Consumer(order: Int, actorPath: String) {
-    var index = 0
+    var index = 0L
   }
   case class Event(id: String, data: Any)
   case class Process(id: String, data: Any)

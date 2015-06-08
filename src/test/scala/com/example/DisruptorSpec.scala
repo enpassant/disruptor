@@ -78,6 +78,24 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       probe1.expectMsg(500.millis, Process(path1, data))
     }
 
+    "answer Busy event if too much event received" in {
+      val bufSize = 8
+      val disruptor = system.actorOf(props(bufSize))
+
+      val (probe1, path1) = addTestProbeConsumer(disruptor, 6)
+
+      disruptor ! Initialized
+      val data = "Test"
+
+      (1 to bufSize) foreach { idx =>
+        disruptor ! Event("1", data)
+        expectNoMsg(10.millis)
+      }
+
+      disruptor ! Event("2", data)
+      expectMsg(100.millis, Busy("2"))
+    }
+
     "send event to every independent consumers" in {
       val disruptor = system.actorOf(props(8))
 
