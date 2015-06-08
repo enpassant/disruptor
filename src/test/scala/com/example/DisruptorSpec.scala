@@ -32,7 +32,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
   "A Disruptor actor" must {
     "ordering Consumers" in {
-      val disruptor = system.actorOf(props(8))
+      val disruptor = system.actorOf(props(8, true))
 
       def checkOrder(expectResult: Array[Consumer]) = {
           disruptor ! GetState
@@ -75,7 +75,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       val data = "Test"
       disruptor ! Event("1", data)
 
-      probe1.expectMsg(500.millis, Process(path1, data))
+      probe1.expectMsg(500.millis, Process(0, path1, data))
     }
 
     "answer Busy event if too much event received" in {
@@ -106,8 +106,8 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       val data = "Test"
       disruptor ! Event("1", data)
 
-      probe1.expectMsg(100.millis, Process(path1, data))
-      probe2.expectMsg(100.millis, Process(path2, data))
+      probe1.expectMsg(100.millis, Process(0, path1, data))
+      probe2.expectMsg(100.millis, Process(0, path2, data))
     }
 
     "send event to every independent consumers and no others" in {
@@ -121,8 +121,8 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       val data = "Test"
       disruptor ! Event("1", data)
 
-      probe1.expectMsg(100.millis, Process(path1, data))
-      probe2.expectMsg(100.millis, Process(path2, data))
+      probe1.expectMsg(100.millis, Process(0, path1, data))
+      probe2.expectMsg(100.millis, Process(0, path2, data))
       probe3.expectNoMsg(100.millis)
     }
 
@@ -137,9 +137,9 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       val data = "Test"
       disruptor ! Event("1", data)
 
-      probe1.expectMsg(100.millis, Process(path1, data))
-      probe2.expectMsg(100.millis, Process(path2, data))
-      probe1.ref ! Processed(path1)
+      probe1.expectMsg(100.millis, Process(0, path1, data))
+      probe2.expectMsg(100.millis, Process(0, path2, data))
+      probe1.ref ! Processed(0, path1)
       probe3.expectNoMsg(100.millis)
     }
 
@@ -154,11 +154,11 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       val data = "Test"
       disruptor ! Event("1", data)
 
-      probe1.expectMsg(100.millis, Process(path1, data))
-      probe2.expectMsg(100.millis, Process(path2, data))
-      probe1.ref ! Processed(path1)
-      probe2.ref ! Processed(path2)
-      probe3.expectMsg(100.millis, Process(path3, data))
+      probe1.expectMsg(100.millis, Process(0, path1, data))
+      probe2.expectMsg(100.millis, Process(0, path2, data))
+      disruptor ! Processed(0, path1)
+      disruptor ! Processed(0, path2)
+      probe3.expectMsg(100.millis, Process(0, path3, data))
     }
   }
 

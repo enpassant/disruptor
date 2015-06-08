@@ -2,7 +2,7 @@ package com.example
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 
-class Disruptor(bufSize: Int) extends Actor with ActorLogging {
+class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging {
   import Disruptor._
 
   val buffer = new Array[BufferItem](bufSize)
@@ -17,7 +17,7 @@ class Disruptor(bufSize: Int) extends Actor with ActorLogging {
     case Initialized =>
       val orders = consumers.map(_.order).toSet
       indexes = new Array[Long](orders.size)
-      log.info(indexes mkString ",")
+      log.debug(indexes mkString ",")
       val cs = consumers.tail.foldLeft(Vector(List(consumers.head))) {
         (a, c) => if (a.last.head.order != c.order) {
             a :+ List(c)
@@ -26,10 +26,10 @@ class Disruptor(bufSize: Int) extends Actor with ActorLogging {
             a.updated(a.size - 1, c :: a.last)
           }
       }
-      log.info(cs mkString ",")
+      log.debug(cs mkString ",")
       context.become(process(cs))
 
-    case GetState if log.isDebugEnabled =>
+    case GetState if testMode =>
       sender ! consumers
   }
 
@@ -37,15 +37,23 @@ class Disruptor(bufSize: Int) extends Actor with ActorLogging {
     case Event(id, data) if (indexes.head - bufSize) < indexes.last =>
       buffer((indexes.head % bufSize).toInt) = BufferItem(sender, id, data)
       indexes(0) = indexes.head + 1
-      log.info(data.toString)
+      log.debug(data.toString)
       step(1, consumers)
 
     case Event(id, data) =>
-      log.info(s"The event buffer is full! The $data is dropped.")
+      log.debug(s"The event buffer is full! The $data is dropped.")
       sender ! Busy(id)
 
-    case Processed(id) =>
-      log.info(s"Received processed message: $id")
+    case Processed(index, id) =>
+      log.debug(s"Received processed message: $id")
+      consumers.flatten.find { c => c.processingIndex == index && c.actorPath == id } foreach {
+        c =>
+          c.index = c.processingIndex + 1
+          c.processingIndex = -1L
+          val i = consumers.indexWhere(_.contains(c))
+          indexes(i) = consumers(i).minBy { _.index }.index
+          step(i + 1, consumers)
+      }
   }
 
   def step(index: Int, consumers: Vector[List[Consumer]]): Unit = {
@@ -58,7 +66,8 @@ class Disruptor(bufSize: Int) extends Actor with ActorLogging {
         val range = (cIndex until prevIndex)
         range.foreach { i =>
           val idx = (i % bufSize).toInt
-          context.actorSelection(consumer.actorPath) ! Process(consumer.actorPath, buffer(idx).data)
+          consumer.processingIndex = i
+          context.actorSelection(consumer.actorPath) ! Process(i, consumer.actorPath, buffer(idx).data)
         }
       }
     }
@@ -66,16 +75,17 @@ class Disruptor(bufSize: Int) extends Actor with ActorLogging {
 }
 
 object Disruptor {
-  def props(bufSize: Int) = Props(new Disruptor(bufSize))
+  def props(bufSize: Int, testMode: Boolean = false) = Props(new Disruptor(bufSize, testMode))
 
   case object GetState
   case object Initialized
   case class Consumer(order: Int, actorPath: String) {
     var index = 0L
+    var processingIndex = -1L
   }
   case class Event(id: String, data: Any)
-  case class Process(id: String, data: Any)
-  case class Processed(id: String)
+  case class Process(index: Long, id: String, data: Any)
+  case class Processed(index: Long, id: String)
   case class Busy(id: String)
   case class BufferItem(sender: ActorRef, id: String, data: Any)
 }

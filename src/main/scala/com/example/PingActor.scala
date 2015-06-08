@@ -10,9 +10,9 @@ class PingActor extends Actor with ActorLogging {
   def receive = {
   	case Initialize =>
 	    log.info("In PingActor - starting ping-pong")
-  	case Disruptor.Process(id, data) =>
+  	case Disruptor.Process(index, id, data) =>
  	  log.info(s"In PingActor - received process message: $data")
-          sender ! Disruptor.Processed(id)
+          sender ! Disruptor.Processed(index, id)
   	case msg =>
   	  log.info(s"In PingActor - received message: $msg")
   }
