@@ -7,7 +7,7 @@ import PingActor._
 object ApplicationMain extends App {
   val system = ActorSystem("MyActorSystem")
 
-  val disruptor = system.actorOf(Disruptor.props(16), "disruptor")
+  val disruptor = system.actorOf(Disruptor.props(160), "disruptor")
   val pingActor1 = system.actorOf(PingActor.props, "pingActor1")
   val pingActor2 = system.actorOf(PingActor.props, "pingActor2")
   val pingActor3 = system.actorOf(PingActor.props, "pingActor3")
@@ -18,16 +18,15 @@ object ApplicationMain extends App {
   disruptor ! Consumer(1, "/user/pingActor2")
   disruptor ! Consumer(2, "/user/pongActor")
 
-  disruptor ! Initialized
-  disruptor ! Event("1", PingMessage("ping1"))
-  disruptor ! Event("2", PingMessage("ping2"))
-  disruptor ! Event("3", PingMessage("ping3"))
-  disruptor ! Event("4", PingMessage("ping4"))
-  disruptor ! Event("5", PingMessage("ping5"))
-  disruptor ! Event("6", PingMessage("ping6"))
-  disruptor ! Event("7", PingMessage("ping7"))
+  val random = new scala.util.Random
 
-  Thread.sleep(3000)
+  disruptor ! Initialized
+  for (i <- 0 until 200) {
+    disruptor ! Event(i.toString, PingMessage(i.toString))
+    Thread.sleep(random.nextInt % 50 + 50)
+  }
+
+  Thread.sleep(15000)
 
   system.shutdown()
   system.awaitTermination()
