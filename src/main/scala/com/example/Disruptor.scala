@@ -53,7 +53,7 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
           val i = consumers.indexWhere(_.contains(c))
           indexes(i) = consumers(i).minBy { _.index }.index
           if (i < indexes.size - 1) {
-            step(i + 1, consumers)
+            step(1, consumers)
           } else {
             val bufferItem = buffer((index % bufSize).toInt)
             bufferItem.sender ! Processed(index, bufferItem.id)
@@ -64,17 +64,21 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
   def step(index: Int, consumers: Vector[List[Consumer]]): Unit = {
     val prevIndex = indexes(index - 1)
 
-    consumers(index).foreach { consumer =>
+    consumers(index).filter(_.processingIndex == -1L).foreach { consumer =>
       val cIndex = consumer.index
       val dif = cIndex - prevIndex
       if (dif <= 0) {
-        val range = (cIndex until prevIndex)
-        range.foreach { i =>
-          val idx = (i % bufSize).toInt
-          consumer.processingIndex = i
-          context.actorSelection(consumer.actorPath) ! Process(i, consumer.actorPath, buffer(idx).data)
-        }
+//        val range = (cIndex until prevIndex)
+//        range.foreach { i =>
+          if (prevIndex > cIndex) {
+            val i = prevIndex - 1
+            val idx = (i % bufSize).toInt
+            consumer.processingIndex = i
+            log.debug(s"${Process(i, consumer.actorPath, buffer(idx).data)}")
+            context.actorSelection(consumer.actorPath) ! Process(i, consumer.actorPath, buffer(idx).data)
+          }
       }
+      if (index < indexes.size - 1) step(index + 1, consumers)
     }
   }
 }

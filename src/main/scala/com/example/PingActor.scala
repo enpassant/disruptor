@@ -13,7 +13,7 @@ class PingActor extends Actor with ActorLogging {
 	    log.info("In PingActor - starting ping-pong")
   	case Disruptor.Process(index, id, data) =>
           counter += 1
- 	  log.info(s"In PingActor - received process message: $counter")
+// 	  log.info(s"In PingActor - received process message: $counter")
           Thread.sleep(random.nextInt % 10 + 10)
           sender ! Disruptor.Processed(index, id)
   	case msg =>
