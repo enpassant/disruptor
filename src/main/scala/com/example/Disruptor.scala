@@ -56,7 +56,6 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
             step(i + 1, consumers)
           } else {
             val bufferItem = buffer((index % bufSize).toInt)
-            log.info(s"BufferItem: $bufferItem")
             bufferItem.sender ! Processed(index, bufferItem.id)
           }
       }
