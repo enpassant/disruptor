@@ -160,6 +160,26 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       disruptor ! Processed(0, path2)
       probe3.expectMsg(100.millis, Process(0, path3, data))
     }
+
+    "answer Processed event when all consumers processed" in {
+      val disruptor = system.actorOf(props(8))
+
+      val (probe1, path1) = addTestProbeConsumer(disruptor, 1)
+      val (probe2, path2) = addTestProbeConsumer(disruptor, 1)
+      val (probe3, path3) = addTestProbeConsumer(disruptor, 2)
+
+      disruptor ! Initialized
+      val data = "Test"
+      disruptor ! Event("1", data)
+
+      probe1.expectMsg(100.millis, Process(0, path1, data))
+      probe2.expectMsg(100.millis, Process(0, path2, data))
+      disruptor ! Processed(0, path1)
+      disruptor ! Processed(0, path2)
+      probe3.expectMsg(100.millis, Process(0, path3, data))
+      disruptor ! Processed(0, path3)
+      expectMsg(100.millis, Processed(0, "1"))
+    }
   }
 
 }

@@ -160,7 +160,6 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       disruptor ! Processed(0, path2)
       probe3.expectMsg(100.millis, Process(0, path3, data))
     }
-  }
 
 }
 

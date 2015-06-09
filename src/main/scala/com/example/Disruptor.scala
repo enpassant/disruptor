@@ -52,7 +52,13 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
           c.processingIndex = -1L
           val i = consumers.indexWhere(_.contains(c))
           indexes(i) = consumers(i).minBy { _.index }.index
-          step(i + 1, consumers)
+          if (i < indexes.size - 1) {
+            step(i + 1, consumers)
+          } else {
+            val bufferItem = buffer((index % bufSize).toInt)
+            log.info(s"BufferItem: $bufferItem")
+            bufferItem.sender ! Processed(index, bufferItem.id)
+          }
       }
   }
 
