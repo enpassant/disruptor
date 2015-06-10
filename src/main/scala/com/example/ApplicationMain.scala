@@ -21,7 +21,7 @@ object ApplicationMain extends App {
   val random = new scala.util.Random
 
   disruptor ! Initialized
-  for (i <- 0 until 1050) {
+  for (i <- 0 until 40) {
     disruptor ! Event(i.toString, PingMessage(i.toString))
     Thread.sleep(random.nextInt % 2 + 10)
   }

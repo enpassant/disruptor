@@ -51,34 +51,42 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
           c.index = c.processingIndex + 1
           c.processingIndex = -1L
           val i = consumers.indexWhere(_.contains(c))
+          val lastIndex = indexes(i)
           indexes(i) = consumers(i).minBy { _.index }.index
           if (i < indexes.size - 1) {
-            step(1, consumers)
+            stepConsumer(indexes(i - 1), c)
+            step(i + 1, consumers)
           } else {
-            val bufferItem = buffer((index % bufSize).toInt)
-            bufferItem.sender ! Processed(index, bufferItem.id)
+            val range = (lastIndex to indexes(i))
+            range.foreach { i =>
+              val bufferItem = buffer((i % bufSize).toInt)
+              bufferItem.sender ! Processed(i, bufferItem.id)
+            }
           }
       }
+  }
+
+  def stepConsumer(prevIndex: Long, consumer: Consumer): Unit = {
+    val cIndex = consumer.index
+    val dif = cIndex - prevIndex
+    if (dif <= 0) {
+//        val range = (cIndex until prevIndex)
+//        range.foreach { i =>
+        if (prevIndex > cIndex) {
+          val i = prevIndex - 1
+          val idx = (i % bufSize).toInt
+          consumer.processingIndex = i
+          log.debug(s"${Process(i, consumer.actorPath, buffer(idx).data)}")
+          context.actorSelection(consumer.actorPath) ! Process(i, consumer.actorPath, buffer(idx).data)
+        }
+    }
   }
 
   def step(index: Int, consumers: Vector[List[Consumer]]): Unit = {
     val prevIndex = indexes(index - 1)
 
-    consumers(index).filter(_.processingIndex == -1L).foreach { consumer =>
-      val cIndex = consumer.index
-      val dif = cIndex - prevIndex
-      if (dif <= 0) {
-//        val range = (cIndex until prevIndex)
-//        range.foreach { i =>
-          if (prevIndex > cIndex) {
-            val i = prevIndex - 1
-            val idx = (i % bufSize).toInt
-            consumer.processingIndex = i
-            log.debug(s"${Process(i, consumer.actorPath, buffer(idx).data)}")
-            context.actorSelection(consumer.actorPath) ! Process(i, consumer.actorPath, buffer(idx).data)
-          }
-      }
-      if (index < indexes.size - 1) step(index + 1, consumers)
+    consumers(index).filter(_.processingIndex == -1L).foreach { c =>
+      stepConsumer(prevIndex, c)
     }
   }
 }
