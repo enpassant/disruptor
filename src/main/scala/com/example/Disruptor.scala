@@ -45,7 +45,7 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
       sender ! Busy(id)
 
     case Processed(index, id) =>
-      log.debug(s"Received processed message: $id")
+      log.debug(s"Received processed message: Processed($index, $id), ${indexes mkString}")
       consumers.flatten.find { c => c.processingIndex == index && c.actorPath == id } foreach {
         c =>
           c.index = c.processingIndex + 1
@@ -53,13 +53,15 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
           val i = consumers.indexWhere(_.contains(c))
           val lastIndex = indexes(i)
           indexes(i) = consumers(i).minBy { _.index }.index
+          stepConsumer(indexes(i - 1), c)
+
           if (i < indexes.size - 1) {
-            stepConsumer(indexes(i - 1), c)
             step(i + 1, consumers)
           } else {
-            val range = (lastIndex to indexes(i))
+            val range = (lastIndex until indexes(i))
             range.foreach { i =>
               val bufferItem = buffer((i % bufSize).toInt)
+              log.info(s"Full processed: ${Processed(i, bufferItem.id)}")
               bufferItem.sender ! Processed(i, bufferItem.id)
             }
           }
@@ -84,6 +86,7 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
 
   def step(index: Int, consumers: Vector[List[Consumer]]): Unit = {
     val prevIndex = indexes(index - 1)
+    log.info(s"Step: $index, $prevIndex")
 
     consumers(index).filter(_.processingIndex == -1L).foreach { c =>
       stepConsumer(prevIndex, c)
