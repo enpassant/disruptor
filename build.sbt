@@ -7,6 +7,13 @@ lazy val commonSettings = Seq(
   organization := "com.example"
 )
 
+scalacOptions ++= Seq(
+  "-feature",
+  "-unchecked",
+  "-deprecation",
+  "-Xlint"
+)
+
 fork in run := true
 
 lazy val root = (project in file(".")).
@@ -18,5 +25,6 @@ lazy val root = (project in file(".")).
     libraryDependencies ++= Seq(
       "com.typesafe.akka" %% "akka-actor" % "2.3.11",
       "com.typesafe.akka" %% "akka-testkit" % "2.3.11" % "it,test",
+      "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8",
       "org.scalatest" %% "scalatest" % "2.2.4" % "it,test")
   )

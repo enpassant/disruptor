@@ -93,7 +93,10 @@ class Disruptor(bufSize: Int, maxCount: Int, testMode: Boolean) extends Actor wi
           val idx = (i % bufSize).toInt
           val maxIdx = if (firstIdx > idx) bufSize else idx + 1
           consumer.processingIndex = i
-          val data = buffer.slice(firstIdx, maxIdx).map(_.data)
+          val data = (maxIdx - firstIdx) match {
+            case 1 => buffer(firstIdx).data
+            case _ => buffer.slice(firstIdx, maxIdx).map(_.data)
+          }
           log.debug(s"${Process(i, consumer.actorPath, data)}")
           context.actorSelection(consumer.actorPath) ! Process(i, consumer.actorPath, data)
         }
