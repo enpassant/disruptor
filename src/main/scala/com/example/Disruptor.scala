@@ -2,7 +2,7 @@ package com.example
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 
-class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging {
+class Disruptor(bufSize: Int, maxCount: Int, testMode: Boolean) extends Actor with ActorLogging {
   import Disruptor._
 
   val buffer = new Array[BufferItem](bufSize)
@@ -85,14 +85,17 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
     val cIndex = consumer.index
     val dif = cIndex - prevIndex
     if (dif <= 0) {
-//        val range = (cIndex until prevIndex)
-//        range.foreach { i =>
         if (prevIndex > cIndex) {
-          val i = prevIndex - 1
+//          val i = prevIndex - 1
+//          val i = cIndex
+          val i = prevIndex.min(cIndex + maxCount) - 1
+          val firstIdx = (cIndex % bufSize).toInt
           val idx = (i % bufSize).toInt
+          val maxIdx = if (firstIdx > idx) bufSize else idx + 1
           consumer.processingIndex = i
-          log.debug(s"${Process(i, consumer.actorPath, buffer(idx).data)}")
-          context.actorSelection(consumer.actorPath) ! Process(i, consumer.actorPath, buffer(idx).data)
+          val data = buffer.slice(firstIdx, maxIdx).map(_.data)
+          log.debug(s"${Process(i, consumer.actorPath, data)}")
+          context.actorSelection(consumer.actorPath) ! Process(i, consumer.actorPath, data)
         }
     }
   }
@@ -108,7 +111,7 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
 }
 
 object Disruptor {
-  def props(bufSize: Int, testMode: Boolean = false) = Props(new Disruptor(bufSize, testMode))
+  def props(bufSize: Int, maxCount: Int = 100, testMode: Boolean = false) = Props(new Disruptor(bufSize, maxCount, testMode))
 
   case object GetState
   case object Initialized
