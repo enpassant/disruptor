@@ -9,11 +9,13 @@ class PongActor extends Actor with ActorLogging {
   var counter = 0
 
   def receive = {
-  	case Disruptor.Process(index, id, data) =>
-          counter += 1
- 	  log.info(s"In PongActor - received process message: $data, $counter")
-          Thread.sleep(random.nextInt % 10 + 10)
-          sender ! Disruptor.Processed(index, id)
+    case Disruptor.Processed(index, "TERM") =>
+      log.info(s"In PongActor - TERMINATED. Processed: $index, $counter")
+      context.system.shutdown
+
+    case Disruptor.Processed(index, data) =>
+      counter += 1
+      log.debug(s"In PongActor - received process message: $data, $counter")
   }
 }
 
