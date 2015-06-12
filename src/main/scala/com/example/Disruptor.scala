@@ -123,10 +123,10 @@ object Disruptor {
     var index = 0L
     var processingIndex = -1L
   }
-  case class Event(id: String, data: Any)
-  case class Process(index: Long, id: String, data: Any)
+  case class Event(id: String, data: AnyRef)
+  case class Process(index: Long, id: String, data: AnyRef)
   case class Processed(index: Long, id: String)
   case class Busy(id: String)
-  case class BufferItem(sender: ActorRef, id: String, data: Any)
+  case class BufferItem(sender: ActorRef, id: String, data: AnyRef)
 }
 

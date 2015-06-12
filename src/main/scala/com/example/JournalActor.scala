@@ -25,8 +25,8 @@ class JournalActor extends Actor with ActorLogging {
   	case Disruptor.Process(index, id, data) =>
           counter += 1
 // 	  log.info(s"In JournalActor - received process message: $counter")
-          val serializer = serialization.findSerializerFor("data a sd asd a sd asd a sd asd as d asd")
-          db.put(bytes(index.toString), serializer.toBinary(data.toString))
+          val serializer = serialization.findSerializerFor(data)
+          db.put(bytes(index.toString), serializer.toBinary(data))
           sender ! Disruptor.Processed(index, id)
   	case msg =>
   	  log.info(s"In JournalActor - received message: $msg")
