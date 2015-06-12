@@ -27,30 +27,33 @@ class Disruptor(bufSize: Int, maxCount: Int, testMode: Boolean) extends Actor wi
           }
       }
       log.debug(cs mkString ",")
-      context.become(process(cs))
+      context.become(process(cs, true))
 
     case GetState if testMode =>
       sender ! consumers
   }
 
-  def process(consumers: Vector[List[Consumer]]): Receive = events(consumers) orElse shutdown(consumers, None)
+  def process(consumers: Vector[List[Consumer]], replaying: Boolean): Receive = events(consumers, replaying) orElse shutdown(consumers, replaying, None)
 
-  def events(consumers: Vector[List[Consumer]]): Receive = {
+  def events(consumers: Vector[List[Consumer]], replaying: Boolean): Receive = {
     case Event(id, data) if (indexes.head - bufSize) < indexes.last =>
       buffer((indexes.head % bufSize).toInt) = BufferItem(sender, id, data)
       indexes(0) = indexes.head + 1
       log.debug(data.toString)
-      step(1, consumers)
+      step(1, replaying, consumers)
 
     case Event(id, Terminate) =>
-      context.become(shutdown(consumers, Some(BufferItem(sender, id, Terminate))))
+      context.become(shutdown(consumers, replaying, Some(BufferItem(sender, id, Terminate))))
 
     case Event(id, data) =>
       log.debug(s"The event buffer is full! The $data is dropped.")
       sender ! Busy(id)
+
+    case ReplayFinished =>
+      context.become(process(consumers, false))
   }
 
-  def shutdown(consumers: Vector[List[Consumer]], terminateItem: Option[BufferItem]): Receive = {
+  def shutdown(consumers: Vector[List[Consumer]], replaying: Boolean, terminateItem: Option[BufferItem]): Receive = {
     case Processed(index, id) =>
       log.debug(s"Received processed message: Processed($index, $id), ${indexes.mkString}")
       consumers.flatten.find { c => c.processingIndex == index && c.actorPath == id } foreach {
@@ -60,10 +63,10 @@ class Disruptor(bufSize: Int, maxCount: Int, testMode: Boolean) extends Actor wi
           val i = consumers.indexWhere(_.contains(c))
           val lastIndex = indexes(i)
           indexes(i) = consumers(i).minBy { _.index }.index
-          stepConsumer(indexes(i - 1), c)
+          stepConsumer(indexes(i - 1), replaying, c)
 
           if (i < indexes.size - 1) {
-            step(i + 1, consumers)
+            step(i + 1, replaying, consumers)
           } else {
             val range = (lastIndex until indexes(i))
             range.foreach { idx =>
@@ -81,7 +84,7 @@ class Disruptor(bufSize: Int, maxCount: Int, testMode: Boolean) extends Actor wi
       }
   }
 
-  def stepConsumer(prevIndex: Long, consumer: Consumer): Unit = {
+  def stepConsumer(prevIndex: Long, replaying: Boolean, consumer: Consumer): Unit = {
     val cIndex = consumer.index
     val dif = cIndex - prevIndex
     if (dif <= 0) {
@@ -97,18 +100,18 @@ class Disruptor(bufSize: Int, maxCount: Int, testMode: Boolean) extends Actor wi
             case 1 => buffer(firstIdx).data
             case _ => buffer.slice(firstIdx, maxIdx).map(_.data)
           }
-          log.debug(s"${Process(i, consumer.actorPath, data)}")
-          context.actorSelection(consumer.actorPath) ! Process(i, consumer.actorPath, data)
+          log.debug(s"${Process(i, consumer.actorPath, replaying, data)}")
+          context.actorSelection(consumer.actorPath) ! Process(i, consumer.actorPath, replaying, data)
         }
     }
   }
 
-  def step(index: Int, consumers: Vector[List[Consumer]]): Unit = {
+  def step(index: Int, replaying: Boolean, consumers: Vector[List[Consumer]]): Unit = {
     val prevIndex = indexes(index - 1)
     log.debug(s"Step: $index, $prevIndex")
 
     consumers(index).filter(_.processingIndex == -1L).foreach { c =>
-      stepConsumer(prevIndex, c)
+      stepConsumer(prevIndex, replaying, c)
     }
   }
 }
@@ -119,12 +122,14 @@ object Disruptor {
   case object GetState
   case object Initialized
   case object Terminate
+  case object ReplayFinished
+
   case class Consumer(order: Int, actorPath: String) {
     var index = 0L
     var processingIndex = -1L
   }
   case class Event(id: String, data: AnyRef)
-  case class Process(index: Long, id: String, data: AnyRef)
+  case class Process(index: Long, id: String, replaying: Boolean, data: AnyRef)
   case class Processed(index: Long, id: String)
   case class Busy(id: String)
   case class BufferItem(sender: ActorRef, id: String, data: AnyRef)
