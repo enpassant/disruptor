@@ -75,7 +75,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       val data = "Test"
       disruptor ! Event("1", data)
 
-      probe1.expectMsg(500.millis, Process(0, path1, data))
+      probe1.expectMsg(500.millis, Process(0, path1, true, data))
     }
 
     "answer Busy event if too much event received" in {
@@ -106,8 +106,8 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       val data = "Test"
       disruptor ! Event("1", data)
 
-      probe1.expectMsg(100.millis, Process(0, path1, data))
-      probe2.expectMsg(100.millis, Process(0, path2, data))
+      probe1.expectMsg(100.millis, Process(0, path1, true, data))
+      probe2.expectMsg(100.millis, Process(0, path2, true, data))
     }
 
     "send event to every independent consumers and no others" in {
@@ -121,8 +121,8 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       val data = "Test"
       disruptor ! Event("1", data)
 
-      probe1.expectMsg(100.millis, Process(0, path1, data))
-      probe2.expectMsg(100.millis, Process(0, path2, data))
+      probe1.expectMsg(100.millis, Process(0, path1, true, data))
+      probe2.expectMsg(100.millis, Process(0, path2, true, data))
       probe3.expectNoMsg(100.millis)
     }
 
@@ -137,8 +137,8 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       val data = "Test"
       disruptor ! Event("1", data)
 
-      probe1.expectMsg(100.millis, Process(0, path1, data))
-      probe2.expectMsg(100.millis, Process(0, path2, data))
+      probe1.expectMsg(100.millis, Process(0, path1, true, data))
+      probe2.expectMsg(100.millis, Process(0, path2, true, data))
       probe1.ref ! Processed(0, path1)
       probe3.expectNoMsg(100.millis)
     }
@@ -154,11 +154,11 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       val data = "Test"
       disruptor ! Event("1", data)
 
-      probe1.expectMsg(100.millis, Process(0, path1, data))
-      probe2.expectMsg(100.millis, Process(0, path2, data))
+      probe1.expectMsg(100.millis, Process(0, path1, true, data))
+      probe2.expectMsg(100.millis, Process(0, path2, true, data))
       disruptor ! Processed(0, path1)
       disruptor ! Processed(0, path2)
-      probe3.expectMsg(100.millis, Process(0, path3, data))
+      probe3.expectMsg(100.millis, Process(0, path3, true, data))
     }
 
     "answer Processed event when all consumers processed" in {
@@ -172,11 +172,11 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       val data = "Test"
       disruptor ! Event("1", data)
 
-      probe1.expectMsg(100.millis, Process(0, path1, data))
-      probe2.expectMsg(100.millis, Process(0, path2, data))
+      probe1.expectMsg(100.millis, Process(0, path1, true, data))
+      probe2.expectMsg(100.millis, Process(0, path2, true, data))
       disruptor ! Processed(0, path1)
       disruptor ! Processed(0, path2)
-      probe3.expectMsg(100.millis, Process(0, path3, data))
+      probe3.expectMsg(100.millis, Process(0, path3, true, data))
       disruptor ! Processed(0, path3)
       expectMsg(100.millis, Processed(0, "1"))
     }
@@ -192,19 +192,19 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       val data = "Test"
       disruptor ! Event("0", data)
 
-      probe1.expectMsg(100.millis, Process(0, path1, data))
-      probe2.expectMsg(100.millis, Process(0, path2, data))
+      probe1.expectMsg(100.millis, Process(0, path1, true, data))
+      probe2.expectMsg(100.millis, Process(0, path2, true, data))
       disruptor ! Processed(0, path1)
       disruptor ! Event("1", data)
-      probe1.expectMsg(100.millis, Process(1, path1, data))
+      probe1.expectMsg(100.millis, Process(1, path1, true, data))
       disruptor ! Processed(0, path2)
-      probe2.expectMsg(100.millis, Process(1, path2, data))
-      probe3.expectMsg(100.millis, Process(0, path3, data))
+      probe2.expectMsg(100.millis, Process(1, path2, true, data))
+      probe3.expectMsg(100.millis, Process(0, path3, true, data))
       disruptor ! Processed(0, path3)
       expectMsg(100.millis, Processed(0, "0"))
       disruptor ! Processed(1, path1)
       disruptor ! Processed(1, path2)
-      probe3.expectMsg(100.millis, Process(1, path3, data))
+      probe3.expectMsg(100.millis, Process(1, path3, true, data))
       disruptor ! Processed(1, path3)
       expectMsg(100.millis, Processed(1, "1"))
     }
@@ -220,18 +220,18 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       val data = "Test"
       disruptor ! Event("0", data)
 
-      probe1.expectMsg(100.millis, Process(0, path1, data))
-      probe2.expectMsg(100.millis, Process(0, path2, data))
+      probe1.expectMsg(100.millis, Process(0, path1, true, data))
+      probe2.expectMsg(100.millis, Process(0, path2, true, data))
       disruptor ! Processed(0, path1)
       disruptor ! Event("1", data)
-      probe1.expectMsg(100.millis, Process(1, path1, data))
+      probe1.expectMsg(100.millis, Process(1, path1, true, data))
       disruptor ! Processed(0, path2)
-      probe2.expectMsg(100.millis, Process(1, path2, data))
-      probe3.expectMsg(100.millis, Process(0, path3, data))
+      probe2.expectMsg(100.millis, Process(1, path2, true, data))
+      probe3.expectMsg(100.millis, Process(0, path3, true, data))
       disruptor ! Processed(1, path1)
       disruptor ! Processed(1, path2)
       disruptor ! Processed(0, path3)
-      probe3.expectMsg(100.millis, Process(1, path3, data))
+      probe3.expectMsg(100.millis, Process(1, path3, true, data))
       expectMsg(100.millis, Processed(0, "0"))
       disruptor ! Processed(1, path3)
       expectMsg(100.millis, Processed(1, "1"))
@@ -250,11 +250,11 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
         val data = "Test"
         disruptor ! Event(i.toString, data)
 
-        probe1.expectMsg(100.millis, Process(i, path1, data))
-        probe2.expectMsg(100.millis, Process(i, path2, data))
+        probe1.expectMsg(100.millis, Process(i, path1, true, data))
+        probe2.expectMsg(100.millis, Process(i, path2, true, data))
         disruptor ! Processed(i, path1)
         disruptor ! Processed(i, path2)
-        probe3.expectMsg(100.millis, Process(i, path3, data))
+        probe3.expectMsg(100.millis, Process(i, path3, true, data))
         disruptor ! Processed(i, path3)
         expectMsg(100.millis, Processed(i, i.toString))
       }

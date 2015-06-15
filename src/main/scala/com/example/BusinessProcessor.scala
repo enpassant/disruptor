@@ -2,8 +2,8 @@ package com.example
 
 import akka.actor.{Actor, ActorLogging, Props}
 
-class PongActor extends Actor with ActorLogging {
-  import PongActor._
+class BusinessProcessor extends Actor with ActorLogging {
+  import BusinessProcessor._
 
   val random = new scala.util.Random
   var counter = 0
@@ -19,7 +19,7 @@ class PongActor extends Actor with ActorLogging {
   }
 }
 
-object PongActor {
-  val props = Props[PongActor]
+object BusinessProcessor {
+  val props = Props[BusinessProcessor]
   case class PongMessage(text: String)
 }

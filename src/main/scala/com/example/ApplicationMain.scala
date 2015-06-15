@@ -13,7 +13,7 @@ object ApplicationMain extends App {
   val journalActor = system.actorOf(JournalActor.props, "journalActor")
   val pingActor2 = system.actorOf(PingActor.props, "pingActor2")
   val pingActor3 = system.actorOf(PingActor.props, "pingActor3")
-  val pongActor = system.actorOf(PongActor.props, "pongActor")
+  val businessProcessor = system.actorOf(BusinessProcessor.props, "businessProcessor")
 
   disruptor ! Consumer(2, "/user/pingActor3")
   disruptor ! Consumer(1, "/user/journalActor")
@@ -21,14 +21,14 @@ object ApplicationMain extends App {
 
   disruptor ! Initialized
 
-  journalActor ! JournalActor.Replay(pongActor, disruptor)
+  journalActor ! JournalActor.Replay(businessProcessor, disruptor)
 
   Thread.sleep(30000)
 
   for (i <- 0 until 1000000) {
-    disruptor.tell(Event(i.toString, PingMessage(i.toString)), pongActor)
+    disruptor.tell(Event(i.toString, PingMessage(i.toString)), businessProcessor)
   }
-  disruptor.tell(Event("TERM", Terminate), pongActor)
+  disruptor.tell(Event("TERM", Terminate), businessProcessor)
 
   system.awaitTermination()
 }
