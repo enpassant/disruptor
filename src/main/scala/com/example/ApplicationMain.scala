@@ -1,34 +1,31 @@
 package com.example
 
-import akka.actor.{ActorSystem, PoisonPill}
+import akka.actor.{ActorRef, ActorSystem, PoisonPill}
 import Disruptor._
 import PingActor._
-
+import scala.concurrent.duration._
+import akka.util.Timeout
+import akka.pattern.ask
 object ApplicationMain extends App {
   val system = ActorSystem("MyActorSystem")
+  implicit val timeout = Timeout(5.seconds)
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   val random = new scala.util.Random
 
-  val disruptor = system.actorOf(Disruptor.props(1024 * 1024, 100), "disruptor")
-  val journalActor = system.actorOf(JournalActor.props, "journalActor")
-  val pingActor2 = system.actorOf(PingActor.props, "pingActor2")
-  val pingActor3 = system.actorOf(PingActor.props, "pingActor3")
   val businessProcessor = system.actorOf(BusinessProcessor.props, "businessProcessor")
 
-  disruptor ! Consumer(2, "/user/pingActor3")
-  disruptor ! Consumer(1, "/user/journalActor")
-  disruptor ! Consumer(1, "/user/pingActor2")
+  //journalActor ! JournalActor.Replay(businessProcessor, disruptor)
 
-  disruptor ! Initialized
+  //Thread.sleep(30000)
+  val futureDisruptor = businessProcessor ? BusinessProcessor.SubscribePublisher
 
-  journalActor ! JournalActor.Replay(businessProcessor, disruptor)
-
-  Thread.sleep(30000)
-
-  for (i <- 0 until 1000000) {
-    disruptor.tell(Event(i.toString, PingMessage(i.toString)), businessProcessor)
+  futureDisruptor onSuccess { case disruptor: ActorRef =>
+    for (i <- 0 until 10) {
+      disruptor.tell(Event(i.toString, PingMessage(i.toString)), businessProcessor)
+    }
+    disruptor.tell(Event("TERM", Terminate), businessProcessor)
   }
-  disruptor.tell(Event("TERM", Terminate), businessProcessor)
 
   system.awaitTermination()
 }

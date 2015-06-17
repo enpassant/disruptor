@@ -33,7 +33,8 @@ class Disruptor(bufSize: Int, maxCount: Int, testMode: Boolean) extends Actor wi
       sender ! consumers
   }
 
-  def process(consumers: Vector[List[Consumer]], replaying: Boolean): Receive = events(consumers, replaying) orElse shutdown(consumers, replaying, None)
+  def process(consumers: Vector[List[Consumer]], replaying: Boolean): Receive =
+    events(consumers, replaying) orElse shutdown(consumers, replaying, None)
 
   def events(consumers: Vector[List[Consumer]], replaying: Boolean): Receive = {
     case Event(id, data) if (indexes.head - bufSize) < indexes.last =>

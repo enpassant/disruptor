@@ -19,25 +19,36 @@ class JournalActor extends Actor with ActorLogging {
   val db = factory.open(new File("/tmp/example.bin"), options);
 
   val serialization = SerializationExtension(context.system)
+  val data = PingMessage("test")
+  val serializer = serialization.findSerializerFor(data)
+  var iterator = db.iterator()
 
   def receive = {
-    case Replay(processor, disruptor) =>
-      log.info("Replay")
-      replay(processor, disruptor)
+    case Disruptor.Process(index, id, _, Array(others @ _*)) =>
+      val (replayed, remains) = others.partition {
+        case Replayed(elem) => true
+        case _ => false
+      }
+      if (replayed.size > 0) sender ! Disruptor.Processed(index - remains.size, id)
+      log.info(s"""In JournalActor - Replayed: ${replayed mkString ", "}""")
+      log.info(s"""In JournalActor - Remains: ${remains mkString ", "}""")
+      process(Disruptor.Process(index, id, false, remains))
 
-    case Initialize =>
-        log.info("In JournalActor - starting ping-pong")
+    case msg =>
+      process(msg)
+  }
 
-    case Disruptor.Process(index, id, _, Terminate) =>
+  def process: Receive = {
+    case Disruptor.Process(index, id, replaying, Replay(processor)) =>
+      replay(processor, sender)
       sender ! Disruptor.Processed(index, id)
 
-    case Disruptor.Process(index, id, true, data) =>
-      counter += 1
+    case Disruptor.Process(index, id, replaying, Replayed(data)) =>
       sender ! Disruptor.Processed(index, id)
 
-    case Disruptor.Process(index, id, false, data) =>
+    case Disruptor.Process(index, id, _, data) =>
       counter += 1
-// 	  log.info(s"In JournalActor - received process message: $counter")
+      log.info(s"In JournalActor - received process message: $index, $data")
       val serializer = serialization.findSerializerFor(data)
       val bb = java.nio.ByteBuffer.allocate(8)
       bb.putLong(index)
@@ -49,10 +60,7 @@ class JournalActor extends Actor with ActorLogging {
   }
 
   def replay(processor: ActorRef, disruptor: ActorRef) = {
-    val data = PingMessage("test")
-    val serializer = serialization.findSerializerFor(data)
-
-    val iterator = db.iterator();
+    iterator = db.iterator()
     try {
       iterator.seekToFirst()
       while (iterator.hasNext()) {
@@ -60,22 +68,22 @@ class JournalActor extends Actor with ActorLogging {
         val key = bb.getLong
         val value = serializer.fromBinary(iterator.peekNext().getValue())
         value match {
-          case array: Array[AnyRef] =>
-            log.debug(key+" = "+ (array mkString ", "))
+          case array: Vector[AnyRef] =>
+            log.info(key+" = "+ (array mkString ", "))
             array foreach { msg =>
-              disruptor.tell(Event(key.toString, msg), processor)
+              disruptor.tell(Event(key.toString, Replayed(msg)), processor)
             }
             Thread.sleep(1)
           case msg: AnyRef =>
-            log.debug(key+" = "+value)
-            disruptor.tell(Event(key.toString, msg), processor)
+            log.info(key+" = "+value)
+            disruptor.tell(Event(key.toString, Replayed(msg)), processor)
         }
         iterator.next()
       }
     } finally {
       // Make sure you close the iterator to avoid resource leaks.
       iterator.close();
-      disruptor.tell(ReplayFinished, processor)
+      disruptor.tell(Event(ReplayFinished.toString, ReplayFinished), processor)
       log.info("ReplayFinished")
     }
   }
@@ -85,7 +93,8 @@ object JournalActor {
   val props = Props[JournalActor]
 
   case object Initialize
-  case class Replay(processor: ActorRef, disruptor: ActorRef)
+  case class Replayed(msg: AnyRef)
+  case class Replay(processor: ActorRef)
   case class PingMessage(text: String)
 }
 
