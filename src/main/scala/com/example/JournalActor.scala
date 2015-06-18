@@ -25,7 +25,9 @@ class JournalActor extends Actor with ActorLogging {
 
   def receive = {
     case Disruptor.Process(index, id, _, Array(others @ _*)) =>
-      val (replayed, remains) = others.partition {
+      val (replayed, remains) = others.filter {
+        _ != Terminate
+      } partition {
         case Replayed(elem) => true
         case _ => false
       }
@@ -39,8 +41,10 @@ class JournalActor extends Actor with ActorLogging {
   }
 
   def process: Receive = {
-    case Disruptor.Process(index, id, replaying, Replay(processor)) =>
-      replay(processor, sender)
+    case Replay(processor, disruptor) =>
+      replay(processor, disruptor)
+
+    case Disruptor.Process(index, id, replaying, Terminate) =>
       sender ! Disruptor.Processed(index, id)
 
     case Disruptor.Process(index, id, replaying, Replayed(data)) =>
@@ -83,8 +87,7 @@ class JournalActor extends Actor with ActorLogging {
     } finally {
       // Make sure you close the iterator to avoid resource leaks.
       iterator.close();
-      disruptor.tell(Event(ReplayFinished.toString, ReplayFinished), processor)
-      log.info("ReplayFinished")
+      processor ! ReplayFinished
     }
   }
 }
@@ -94,7 +97,7 @@ object JournalActor {
 
   case object Initialize
   case class Replayed(msg: AnyRef)
-  case class Replay(processor: ActorRef)
+  case class Replay(processor: ActorRef, disruptor: ActorRef)
   case class PingMessage(text: String)
 }
 

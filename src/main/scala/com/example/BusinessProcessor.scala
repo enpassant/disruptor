@@ -24,14 +24,14 @@ class BusinessProcessor extends Actor with ActorLogging {
 
   disruptor ! Initialized
 
-  disruptor ! Event(Replay.toString, Replay(self))
+  journalActor ! Replay(self, disruptor)
 
   def receive = {
     case SubscribePublisher =>
       publishers = publishers ++ List(sender)
 
-    case Disruptor.Processed(index, str) if str == ReplayFinished.toString =>
-      log.info(s"BusinessProcessor - Start publishing: $index")
+    case ReplayFinished =>
+      log.info(s"BusinessProcessor - Start publishing")
       publishers foreach { _ ! disruptor }
 
     case Disruptor.Processed(index, "TERM") =>
