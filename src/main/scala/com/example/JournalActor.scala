@@ -75,12 +75,12 @@ class JournalActor extends Actor with ActorLogging {
           case array: Vector[AnyRef] =>
             log.info(key+" = "+ (array mkString ", "))
             array foreach { msg =>
-              disruptor.tell(Event(key.toString, Replayed(msg)), processor)
+              disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), processor)
             }
             Thread.sleep(1)
           case msg: AnyRef =>
             log.info(key+" = "+value)
-            disruptor.tell(Event(key.toString, Replayed(msg)), processor)
+            disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), processor)
         }
         iterator.next()
       }

@@ -37,16 +37,16 @@ class Disruptor(bufSize: Int, maxCount: Int, testMode: Boolean) extends Actor wi
     events(consumers, replaying) orElse shutdown(consumers, replaying, None)
 
   def events(consumers: Vector[List[Consumer]], replaying: Boolean): Receive = {
-    case Event(id, data) if (indexes.head - bufSize) < indexes.last =>
+    case PersistentEvent(id, data) if (indexes.head - bufSize) < indexes.last =>
       buffer((indexes.head % bufSize).toInt) = BufferItem(sender, id, data)
       indexes(0) = indexes.head + 1
       log.debug(data.toString)
       step(1, replaying, consumers)
 
-    case Event(id, Terminate) =>
+    case PersistentEvent(id, Terminate) =>
       context.become(shutdown(consumers, replaying, Some(BufferItem(sender, id, Terminate))))
 
-    case Event(id, data) =>
+    case PersistentEvent(id, data) =>
       log.debug(s"The event buffer is full! The $data is dropped.")
       sender ! Busy(id)
 
@@ -120,6 +120,10 @@ class Disruptor(bufSize: Int, maxCount: Int, testMode: Boolean) extends Actor wi
 object Disruptor {
   def props(bufSize: Int, maxCount: Int = 100, testMode: Boolean = false) = Props(new Disruptor(bufSize, maxCount, testMode))
 
+  sealed trait Message extends AnyRef
+  trait Command extends Message
+  trait Event extends Message
+
   case object GetState
   case object Initialized
   case object Terminate
@@ -129,7 +133,7 @@ object Disruptor {
     var index = 0L
     var processingIndex = -1L
   }
-  case class Event(id: String, data: AnyRef)
+  case class PersistentEvent(id: String, data: AnyRef)
   case class Process(index: Long, id: String, replaying: Boolean, data: AnyRef)
   case class Processed(index: Long, id: String)
   case class Busy(id: String)

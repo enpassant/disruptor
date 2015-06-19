@@ -73,7 +73,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       disruptor ! Initialized
       val data = "Test"
-      disruptor ! Event("1", data)
+      disruptor ! PersistentEvent("1", data)
 
       probe1.expectMsg(500.millis, Process(0, path1, true, data))
     }
@@ -88,11 +88,11 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       val data = "Test"
 
       (1 to bufSize) foreach { idx =>
-        disruptor ! Event("1", data)
+        disruptor ! PersistentEvent("1", data)
         expectNoMsg(10.millis)
       }
 
-      disruptor ! Event("2", data)
+      disruptor ! PersistentEvent("2", data)
       expectMsg(100.millis, Busy("2"))
     }
 
@@ -104,7 +104,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       disruptor ! Initialized
       val data = "Test"
-      disruptor ! Event("1", data)
+      disruptor ! PersistentEvent("1", data)
 
       probe1.expectMsg(100.millis, Process(0, path1, true, data))
       probe2.expectMsg(100.millis, Process(0, path2, true, data))
@@ -119,7 +119,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       disruptor ! Initialized
       val data = "Test"
-      disruptor ! Event("1", data)
+      disruptor ! PersistentEvent("1", data)
 
       probe1.expectMsg(100.millis, Process(0, path1, true, data))
       probe2.expectMsg(100.millis, Process(0, path2, true, data))
@@ -135,7 +135,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       disruptor ! Initialized
       val data = "Test"
-      disruptor ! Event("1", data)
+      disruptor ! PersistentEvent("1", data)
 
       probe1.expectMsg(100.millis, Process(0, path1, true, data))
       probe2.expectMsg(100.millis, Process(0, path2, true, data))
@@ -152,7 +152,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       disruptor ! Initialized
       val data = "Test"
-      disruptor ! Event("1", data)
+      disruptor ! PersistentEvent("1", data)
 
       probe1.expectMsg(100.millis, Process(0, path1, true, data))
       probe2.expectMsg(100.millis, Process(0, path2, true, data))
@@ -170,7 +170,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       disruptor ! Initialized
       val data = "Test"
-      disruptor ! Event("1", data)
+      disruptor ! PersistentEvent("1", data)
 
       probe1.expectMsg(100.millis, Process(0, path1, true, data))
       probe2.expectMsg(100.millis, Process(0, path2, true, data))
@@ -190,12 +190,12 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       disruptor ! Initialized
       val data = "Test"
-      disruptor ! Event("0", data)
+      disruptor ! PersistentEvent("0", data)
 
       probe1.expectMsg(100.millis, Process(0, path1, true, data))
       probe2.expectMsg(100.millis, Process(0, path2, true, data))
       disruptor ! Processed(0, path1)
-      disruptor ! Event("1", data)
+      disruptor ! PersistentEvent("1", data)
       probe1.expectMsg(100.millis, Process(1, path1, true, data))
       disruptor ! Processed(0, path2)
       probe2.expectMsg(100.millis, Process(1, path2, true, data))
@@ -218,12 +218,12 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       disruptor ! Initialized
       val data = "Test"
-      disruptor ! Event("0", data)
+      disruptor ! PersistentEvent("0", data)
 
       probe1.expectMsg(100.millis, Process(0, path1, true, data))
       probe2.expectMsg(100.millis, Process(0, path2, true, data))
       disruptor ! Processed(0, path1)
-      disruptor ! Event("1", data)
+      disruptor ! PersistentEvent("1", data)
       probe1.expectMsg(100.millis, Process(1, path1, true, data))
       disruptor ! Processed(0, path2)
       probe2.expectMsg(100.millis, Process(1, path2, true, data))
@@ -248,7 +248,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       for (i <- 0 until 10000) {
         val data = "Test"
-        disruptor ! Event(i.toString, data)
+        disruptor ! PersistentEvent(i.toString, data)
 
         probe1.expectMsg(100.millis, Process(i, path1, true, data))
         probe2.expectMsg(100.millis, Process(i, path2, true, data))
