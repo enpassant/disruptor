@@ -55,7 +55,7 @@ class BusinessProcessor extends Actor with ActorLogging {
 }
 
 object BusinessProcessor {
-  val BufSize = 1024
+  val BufSize = 1024 * 1024
   val props = Props[BusinessProcessor]
 
   case object SubscribePublisher

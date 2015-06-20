@@ -28,7 +28,7 @@ object ApplicationMain extends App {
   }
 
   futureDisruptor onSuccess { case disruptor: ActorRef =>
-    for (i <- 0 until 500) {
+    for (i <- 0 until 500000) {
       disruptor.tell(PersistentEvent(i.toString, PingMessage(i.toString)), businessProcessor)
     }
     disruptor.tell(PersistentEvent("TERM", Terminate), businessProcessor)

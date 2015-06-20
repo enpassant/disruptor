@@ -89,10 +89,12 @@ class Disruptor(bufSize: Int, maxCount: Int, testMode: Boolean) extends Actor wi
         if (prevIndex > cIndex) {
 //          val i = prevIndex - 1
 //          val i = cIndex
-          val i = prevIndex.min(cIndex + maxCount) - 1
+          val i1 = prevIndex.min(cIndex + maxCount) - 1
           val firstIdx = (cIndex % bufSize).toInt
-          val idx = (i % bufSize).toInt
+          val idx = (i1 % bufSize).toInt
           val maxIdx = if (firstIdx > idx) bufSize else idx + 1
+          val i = cIndex + maxIdx - firstIdx - 1
+//          val i = i1
           consumer.processingIndex = i
           val data = (maxIdx - firstIdx) match {
             case 1 => buffer(firstIdx).data

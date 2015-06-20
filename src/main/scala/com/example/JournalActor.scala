@@ -13,7 +13,7 @@ class JournalActor extends Actor with ActorLogging {
   import JournalActor._
 
   val random = new scala.util.Random
-  var counter = 0
+  var counter = 0L
 
   val options = new Options();
   options.createIfMissing(true);
@@ -56,7 +56,6 @@ class JournalActor extends Actor with ActorLogging {
       sender ! Disruptor.Processed(index, id)
 
     case Disruptor.Process(index, id, _, data: Seq[AnyRef]) =>
-      counter += 1
       log.debug(s"In JournalActor - received process message: $index, $data")
       val serializer = serialization.findSerializerFor(data)
       var i = index - data.size
@@ -67,6 +66,8 @@ class JournalActor extends Actor with ActorLogging {
           val bb = java.nio.ByteBuffer.allocate(8)
           bb.putLong(i)
           batch.put(bb.array, serializer.toBinary(d))
+          if (counter != i) log.info(s"Key 1 is invalid. $i vs $counter")
+          counter += 1
         }
         db.write(batch)
       } finally {
@@ -75,12 +76,13 @@ class JournalActor extends Actor with ActorLogging {
       sender ! Disruptor.Processed(index, id)
 
     case Disruptor.Process(index, id, _, data) =>
-      counter += 1
       log.debug(s"In JournalActor - received process message: $index, $data")
       val serializer = serialization.findSerializerFor(data)
       val bb = java.nio.ByteBuffer.allocate(8)
       bb.putLong(index)
       db.put(bb.array, serializer.toBinary(data))
+      if (counter != index) log.info(s"Key 2 is invalid. $index vs $counter")
+      counter += 1
       sender ! Disruptor.Processed(index, id)
 
     case msg =>
@@ -95,7 +97,6 @@ class JournalActor extends Actor with ActorLogging {
       var i = 0
       while (iter.hasNext && i < count) {
         i += 1
-        counter += 1
         val bb = ByteBuffer.wrap(iter.peekNext().getKey())
         val key = bb.getLong
         val value = serializer.fromBinary(iter.peekNext().getValue())
@@ -103,10 +104,14 @@ class JournalActor extends Actor with ActorLogging {
           case array: Vector[AnyRef] =>
             log.debug(key+" = "+ (array mkString ", "))
             array foreach { msg =>
+              if (counter != key) log.info(s"Key 3 is invalid. $key vs $counter")
+              counter += 1
               disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), processor)
             }
           case msg: AnyRef =>
             log.debug(key+" = "+value)
+            if (counter != key) log.info(s"Key 4 is invalid. $key vs $counter")
+            counter += 1
             disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), processor)
         }
         iter.next()
