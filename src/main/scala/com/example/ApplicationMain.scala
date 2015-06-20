@@ -9,7 +9,7 @@ import akka.pattern.ask
 
 object ApplicationMain extends App {
   val system = ActorSystem("MyActorSystem")
-  implicit val timeout = Timeout(25.seconds)
+  implicit val timeout = Timeout(60.seconds)
   import scala.concurrent.ExecutionContext.Implicits.global
 
   val random = new scala.util.Random
@@ -28,7 +28,7 @@ object ApplicationMain extends App {
   }
 
   futureDisruptor onSuccess { case disruptor: ActorRef =>
-    for (i <- 0 until 1000000) {
+    for (i <- 0 until 500) {
       disruptor.tell(PersistentEvent(i.toString, PingMessage(i.toString)), businessProcessor)
     }
     disruptor.tell(PersistentEvent("TERM", Terminate), businessProcessor)

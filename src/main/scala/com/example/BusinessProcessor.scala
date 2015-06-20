@@ -1,6 +1,7 @@
 package com.example
 
-import akka.actor.{Actor, ActorRef, ActorLogging, Props}
+import akka.actor.{Actor, ActorRef, ActorLogging, Props, ReceiveTimeout}
+import scala.concurrent.duration._
 
 class BusinessProcessor extends Actor with ActorLogging {
   import JournalActor._
@@ -10,9 +11,9 @@ class BusinessProcessor extends Actor with ActorLogging {
   val random = new scala.util.Random
   var counter = 0
   var publishers = List.empty[ActorRef]
-  var replaying = true 
+  var replaying = true
 
-  val disruptor = context.actorOf(Disruptor.props(1024 * 1024, 100), "disruptor")
+  val disruptor = context.actorOf(Disruptor.props(BufSize, 100), "disruptor")
   val journalActor = context.actorOf(JournalActor.props, "journalActor")
   val pingActor2 = context.actorOf(PingActor.props, "pingActor2")
   val pingActor3 = context.actorOf(PingActor.props, "pingActor3")
@@ -28,15 +29,19 @@ class BusinessProcessor extends Actor with ActorLogging {
   def receive = {
     case Initialized =>
       log.info(s"BusinessProcessor - Start replaying")
-      journalActor ! Replay(self, disruptor)
+      journalActor ! Replay(self, disruptor, BufSize - 10)
 
     case SubscribePublisher =>
       publishers = publishers ++ List(sender)
 
-    case ReplayFinished =>
+    case ReceiveTimeout =>
       log.info(s"BusinessProcessor - Start publishing")
-      replaying = false
       publishers foreach { _ ! disruptor }
+      context.setReceiveTimeout(Duration.Undefined)
+
+    case ReplayFinished =>
+      replaying = false
+      context.setReceiveTimeout(1.second)
 
     case Disruptor.Processed(index, "TERM") =>
       log.info(s"In PongActor - TERMINATED. Processed: $index, $counter")
@@ -50,6 +55,7 @@ class BusinessProcessor extends Actor with ActorLogging {
 }
 
 object BusinessProcessor {
+  val BufSize = 1024
   val props = Props[BusinessProcessor]
 
   case object SubscribePublisher

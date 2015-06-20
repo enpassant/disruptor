@@ -26,7 +26,7 @@ class JournalActor extends Actor with ActorLogging {
 
   def receive = {
     case ReplayNext(processor, disruptor) =>
-      sendNext(processor, disruptor)
+      sendNext(processor, disruptor, 1)
 
     case Disruptor.Process(index, id, _, Array(others @ _*)) =>
       val (replayed, remains) = others.filter {
@@ -38,20 +38,21 @@ class JournalActor extends Actor with ActorLogging {
       if (replayed.size > 0) sender ! Disruptor.Processed(index - remains.size, id)
       log.debug(s"""In JournalActor - Replayed: ${replayed mkString ", "}""")
       log.debug(s"""In JournalActor - Remains: ${remains mkString ", "}""")
-      process(Disruptor.Process(index, id, false, remains))
+      if (remains.size > 0) process(Disruptor.Process(index, id, false, remains))
 
     case msg =>
       process(msg)
   }
 
   def process: Receive = {
-    case Replay(processor, disruptor) =>
-      replay(processor, disruptor)
+    case Replay(processor, disruptor, count) =>
+      replay(processor, disruptor, count)
 
     case Disruptor.Process(index, id, replaying, Terminate) =>
       sender ! Disruptor.Processed(index, id)
 
     case Disruptor.Process(index, id, replaying, Replayed(data)) =>
+      log.debug(s"""In JournalActor - Replayed: $data""")
       sender ! Disruptor.Processed(index, id)
 
     case Disruptor.Process(index, id, _, data: Seq[AnyRef]) =>
@@ -62,10 +63,10 @@ class JournalActor extends Actor with ActorLogging {
       val batch = db.createWriteBatch
       try {
         data foreach { d =>
+          i = i + 1
           val bb = java.nio.ByteBuffer.allocate(8)
           bb.putLong(i)
           batch.put(bb.array, serializer.toBinary(d))
-          i = i + 1
         }
         db.write(batch)
       } finally {
@@ -86,12 +87,15 @@ class JournalActor extends Actor with ActorLogging {
       log.debug(s"In JournalActor - received message: $msg")
   }
 
-  def sendNext(processor: ActorRef, disruptor: ActorRef) = {
+  def sendNext(processor: ActorRef, disruptor: ActorRef, count: Long) = {
     log.debug("sendNext")
 
     iterator foreach { iter =>
       log.debug(s"isNext: ${iter.hasNext}")
-      if (iter.hasNext) {
+      var i = 0
+      while (iter.hasNext && i < count) {
+        i += 1
+        counter += 1
         val bb = ByteBuffer.wrap(iter.peekNext().getKey())
         val key = bb.getLong
         val value = serializer.fromBinary(iter.peekNext().getValue())
@@ -106,8 +110,9 @@ class JournalActor extends Actor with ActorLogging {
             disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), processor)
         }
         iter.next()
-      } else {
-        log.debug("close Replay")
+      }
+      if (!iter.hasNext) {
+        log.info(s"Close Replay: $counter")
 
         // Make sure you close the iterator to avoid resource leaks.
         iter.close()
@@ -117,14 +122,14 @@ class JournalActor extends Actor with ActorLogging {
     }
   }
 
-  def replay(processor: ActorRef, disruptor: ActorRef) = {
+  def replay(processor: ActorRef, disruptor: ActorRef, count: Long) = {
     log.debug("Start replay")
 
     val iter = db.iterator()
     iter.seekToFirst()
     log.debug(s"isNext: ${iter.hasNext}")
     iterator = Some(iter)
-    sendNext(processor, disruptor)
+    sendNext(processor, disruptor, count)
   }
 }
 
@@ -132,9 +137,10 @@ object JournalActor {
   val props = Props[JournalActor]
 
   case object Initialize
+  case object ReplayFinished
   case class Replayed(msg: AnyRef)
-  case class Replay(processor: ActorRef, disruptor: ActorRef) extends ConsumerCommand
-  case class ReplayNext(processor: ActorRef, disruptor: ActorRef) extends ConsumerCommand
+  case class Replay(processor: ActorRef, disruptor: ActorRef, count: Long)
+  case class ReplayNext(processor: ActorRef, disruptor: ActorRef)
   case class PingMessage(text: String)
 }
 

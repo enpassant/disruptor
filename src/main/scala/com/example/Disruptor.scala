@@ -37,21 +37,18 @@ class Disruptor(bufSize: Int, maxCount: Int, testMode: Boolean) extends Actor wi
     events(consumers, replaying) orElse shutdown(consumers, replaying, None)
 
   def events(consumers: Vector[List[Consumer]], replaying: Boolean): Receive = {
+    case PersistentEvent(id, Terminate) =>
+      context.become(shutdown(consumers, replaying, Some(BufferItem(sender, id, Terminate))))
+
     case PersistentEvent(id, data) if (indexes.head - bufSize) < indexes.last =>
       buffer((indexes.head % bufSize).toInt) = BufferItem(sender, id, data)
       indexes(0) = indexes.head + 1
       log.debug(data.toString)
       step(1, replaying, consumers)
 
-    case PersistentEvent(id, Terminate) =>
-      context.become(shutdown(consumers, replaying, Some(BufferItem(sender, id, Terminate))))
-
     case PersistentEvent(id, data) =>
-      log.debug(s"The event buffer is full! The $data is dropped.")
+      log.info(s"The event buffer is full! The $data is dropped.")
       sender ! Busy(id)
-
-    case ReplayFinished =>
-      context.become(process(consumers, false))
   }
 
   def shutdown(consumers: Vector[List[Consumer]], replaying: Boolean, terminateItem: Option[BufferItem]): Receive = {
@@ -128,7 +125,6 @@ object Disruptor {
   case object GetState
   case object Initialized
   case object Terminate
-  case object ReplayFinished
 
   case class Consumer(order: Int, actorPath: String) {
     var index = 0L
