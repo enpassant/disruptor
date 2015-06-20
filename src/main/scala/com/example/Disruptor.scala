@@ -123,6 +123,7 @@ object Disruptor {
   sealed trait Message extends AnyRef
   trait Command extends Message
   trait Event extends Message
+  trait ConsumerCommand extends Command
 
   case object GetState
   case object Initialized

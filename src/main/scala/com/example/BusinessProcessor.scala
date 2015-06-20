@@ -10,6 +10,7 @@ class BusinessProcessor extends Actor with ActorLogging {
   val random = new scala.util.Random
   var counter = 0
   var publishers = List.empty[ActorRef]
+  var replaying = true 
 
   val disruptor = context.actorOf(Disruptor.props(1024 * 1024, 100), "disruptor")
   val journalActor = context.actorOf(JournalActor.props, "journalActor")
@@ -24,14 +25,17 @@ class BusinessProcessor extends Actor with ActorLogging {
 
   disruptor ! Initialized
 
-  journalActor ! Replay(self, disruptor)
-
   def receive = {
+    case Initialized =>
+      log.info(s"BusinessProcessor - Start replaying")
+      journalActor ! Replay(self, disruptor)
+
     case SubscribePublisher =>
       publishers = publishers ++ List(sender)
 
     case ReplayFinished =>
       log.info(s"BusinessProcessor - Start publishing")
+      replaying = false
       publishers foreach { _ ! disruptor }
 
     case Disruptor.Processed(index, "TERM") =>
@@ -40,7 +44,8 @@ class BusinessProcessor extends Actor with ActorLogging {
 
     case Disruptor.Processed(index, data) =>
       counter += 1
-      log.info(s"In PongActor - received process message: $index, $counter, $data")
+      if (replaying) journalActor ! ReplayNext(self, disruptor)
+      log.debug(s"In PongActor - received process message: $index, $counter, $data")
   }
 }
 

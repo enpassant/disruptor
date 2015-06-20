@@ -6,9 +6,10 @@ import PingActor._
 import scala.concurrent.duration._
 import akka.util.Timeout
 import akka.pattern.ask
+
 object ApplicationMain extends App {
   val system = ActorSystem("MyActorSystem")
-  implicit val timeout = Timeout(5.seconds)
+  implicit val timeout = Timeout(25.seconds)
   import scala.concurrent.ExecutionContext.Implicits.global
 
   val random = new scala.util.Random
@@ -20,8 +21,14 @@ object ApplicationMain extends App {
   //Thread.sleep(30000)
   val futureDisruptor = businessProcessor ? BusinessProcessor.SubscribePublisher
 
+  businessProcessor ! Disruptor.Initialized
+
+  futureDisruptor onFailure { case error =>
+    system.shutdown
+  }
+
   futureDisruptor onSuccess { case disruptor: ActorRef =>
-    for (i <- 0 until 10) {
+    for (i <- 0 until 1000000) {
       disruptor.tell(PersistentEvent(i.toString, PingMessage(i.toString)), businessProcessor)
     }
     disruptor.tell(PersistentEvent("TERM", Terminate), businessProcessor)
