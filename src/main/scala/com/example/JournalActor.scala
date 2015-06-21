@@ -23,10 +23,12 @@ class JournalActor extends Actor with ActorLogging {
   val data = PingMessage("test")
   val serializer = serialization.findSerializerFor(data)
   var iterator: Option[DBIterator] = None
+  var disruptor: ActorRef = _
+  var processor: ActorRef = _
 
   def receive = {
     case ReplayNext(processor, disruptor) =>
-      sendNext(processor, disruptor, 1)
+      sendNext(1)
 
     case Disruptor.Process(index, id, _, Array(others @ _*)) =>
       val (replayed, remains) = others.filter {
@@ -40,13 +42,19 @@ class JournalActor extends Actor with ActorLogging {
       log.debug(s"""In JournalActor - Remains: ${remains mkString ", "}""")
       if (remains.size > 0) process(Disruptor.Process(index, id, false, remains))
 
+    case Disruptor.Processed(index, data) =>
+      log.debug(s"In JournalActor - received process message: $index, $counter, $data")
+      sendNext(1)
+
     case msg =>
       process(msg)
   }
 
   def process: Receive = {
-    case Replay(processor, disruptor, count) =>
-      replay(processor, disruptor, count)
+    case Replay(p, d, count) =>
+      processor = p
+      disruptor = d
+      replay(count)
 
     case Disruptor.Process(index, id, replaying, Terminate) =>
       sender ! Disruptor.Processed(index, id)
@@ -89,7 +97,7 @@ class JournalActor extends Actor with ActorLogging {
       log.debug(s"In JournalActor - received message: $msg")
   }
 
-  def sendNext(processor: ActorRef, disruptor: ActorRef, count: Long) = {
+  def sendNext(count: Long) = {
     log.debug("sendNext")
 
     iterator foreach { iter =>
@@ -106,13 +114,13 @@ class JournalActor extends Actor with ActorLogging {
             array foreach { msg =>
               if (counter != key) log.info(s"Key 3 is invalid. $key vs $counter")
               counter += 1
-              disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), processor)
+              disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), self)
             }
           case msg: AnyRef =>
             log.debug(key+" = "+value)
             if (counter != key) log.info(s"Key 4 is invalid. $key vs $counter")
             counter += 1
-            disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), processor)
+            disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), self)
         }
         iter.next()
       }
@@ -127,14 +135,14 @@ class JournalActor extends Actor with ActorLogging {
     }
   }
 
-  def replay(processor: ActorRef, disruptor: ActorRef, count: Long) = {
+  def replay(count: Long) = {
     log.debug("Start replay")
 
     val iter = db.iterator()
     iter.seekToFirst()
     log.debug(s"isNext: ${iter.hasNext}")
     iterator = Some(iter)
-    sendNext(processor, disruptor, count)
+    sendNext(count)
   }
 }
 

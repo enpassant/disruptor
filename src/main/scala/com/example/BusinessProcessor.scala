@@ -21,6 +21,7 @@ class BusinessProcessor extends Actor with ActorLogging {
   disruptor ! Consumer(2, pingActor3.path.toString)
   disruptor ! Consumer(1, journalActor.path.toString)
   disruptor ! Consumer(1, pingActor2.path.toString)
+  disruptor ! Consumer(3, self.path.toString)
 
   disruptor ! Initialized
 
@@ -41,13 +42,15 @@ class BusinessProcessor extends Actor with ActorLogging {
       replaying = false
       context.setReceiveTimeout(1.second)
 
+    case Disruptor.Process(index, id, replaying, data) =>
+      sender ! Disruptor.Processed(index, id)
+
     case Disruptor.Processed(index, "TERM") =>
       log.info(s"In PongActor - TERMINATED. Processed: $index, $counter")
       context.system.shutdown
 
     case Disruptor.Processed(index, data) =>
       counter += 1
-      if (replaying) journalActor ! ReplayNext(self, disruptor)
       log.debug(s"In PongActor - received process message: $index, $counter, $data")
   }
 }
