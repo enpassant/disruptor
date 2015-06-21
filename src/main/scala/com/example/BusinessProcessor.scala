@@ -18,11 +18,9 @@ class BusinessProcessor extends Actor with ActorLogging {
   val pingActor2 = context.actorOf(PingActor.props, "pingActor2")
   val pingActor3 = context.actorOf(PingActor.props, "pingActor3")
 
-  def getPath(actorRef: ActorRef) = "/" + (actorRef.path.elements mkString "/")
-
-  disruptor ! Consumer(2, getPath(pingActor3))
-  disruptor ! Consumer(1, getPath(journalActor))
-  disruptor ! Consumer(1, getPath(pingActor2))
+  disruptor ! Consumer(2, pingActor3.path.toString)
+  disruptor ! Consumer(1, journalActor.path.toString)
+  disruptor ! Consumer(1, pingActor2.path.toString)
 
   disruptor ! Initialized
 
