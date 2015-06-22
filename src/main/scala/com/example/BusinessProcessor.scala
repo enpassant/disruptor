@@ -13,15 +13,15 @@ class BusinessProcessor extends Actor with ActorLogging {
   var publishers = List.empty[ActorRef]
   var replaying = true
 
-  val disruptor = context.actorOf(Disruptor.props(BufSize, 100), "disruptor")
+  val disruptor = context.actorOf(Disruptor.props(BufSize), "disruptor")
   val journalActor = context.actorOf(JournalActor.props, "journalActor")
   val pingActor2 = context.actorOf(PingActor.props, "pingActor2")
   val pingActor3 = context.actorOf(PingActor.props, "pingActor3")
 
-  disruptor ! Consumer(2, pingActor3.path.toString)
-  disruptor ! Consumer(1, journalActor.path.toString)
-  disruptor ! Consumer(1, pingActor2.path.toString)
-  disruptor ! Consumer(3, self.path.toString)
+  disruptor ! Consumer(2, pingActor3.path.toString, 100)
+  disruptor ! Consumer(1, journalActor.path.toString, 100)
+  disruptor ! Consumer(1, pingActor2.path.toString, 100)
+  disruptor ! Consumer(3, self.path.toString, 100)
 
   disruptor ! Initialized
 

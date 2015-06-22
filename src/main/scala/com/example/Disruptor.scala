@@ -2,7 +2,7 @@ package com.example
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 
-class Disruptor(bufSize: Int, maxCount: Int, testMode: Boolean) extends Actor with ActorLogging {
+class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging {
   import Disruptor._
 
   val buffer = new Array[BufferItem](bufSize)
@@ -89,7 +89,7 @@ class Disruptor(bufSize: Int, maxCount: Int, testMode: Boolean) extends Actor wi
         if (prevIndex > cIndex) {
 //          val i = prevIndex - 1
 //          val i = cIndex
-          val i1 = prevIndex.min(cIndex + maxCount) - 1
+          val i1 = prevIndex.min(cIndex + consumer.maxCount) - 1
           val firstIdx = (cIndex % bufSize).toInt
           val idx = (i1 % bufSize).toInt
           val maxIdx = if (firstIdx > idx) bufSize else idx + 1
@@ -117,7 +117,7 @@ class Disruptor(bufSize: Int, maxCount: Int, testMode: Boolean) extends Actor wi
 }
 
 object Disruptor {
-  def props(bufSize: Int, maxCount: Int = 100, testMode: Boolean = false) = Props(new Disruptor(bufSize, maxCount, testMode))
+  def props(bufSize: Int, testMode: Boolean = false) = Props(new Disruptor(bufSize, testMode))
 
   sealed trait Message extends AnyRef
   trait Command extends Message
@@ -128,7 +128,7 @@ object Disruptor {
   case object Initialized
   case object Terminate
 
-  case class Consumer(order: Int, actorPath: String) {
+  case class Consumer(order: Int, actorPath: String, maxCount: Int = 100) {
     var index = 0L
     var processingIndex = -1L
   }
