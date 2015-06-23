@@ -42,7 +42,7 @@ class BusinessProcessor extends Actor with ActorLogging {
       replaying = false
       context.setReceiveTimeout(1.second)
 
-    case Disruptor.Process(index, id, replaying, data) =>
+    case Disruptor.Process(index, id, data) =>
       sender ! Disruptor.Processed(index, id)
 
     case Disruptor.Processed(index, "TERM") =>

@@ -27,31 +27,31 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
           }
       }
       log.debug(cs mkString ",")
-      context.become(process(cs, true))
+      context.become(process(cs))
 
     case GetState if testMode =>
       sender ! consumers
   }
 
-  def process(consumers: Vector[List[Consumer]], replaying: Boolean): Receive =
-    events(consumers, replaying) orElse shutdown(consumers, replaying, None)
+  def process(consumers: Vector[List[Consumer]]): Receive =
+    events(consumers) orElse shutdown(consumers, None)
 
-  def events(consumers: Vector[List[Consumer]], replaying: Boolean): Receive = {
+  def events(consumers: Vector[List[Consumer]]): Receive = {
     case PersistentEvent(id, Terminate) =>
-      context.become(shutdown(consumers, replaying, Some(BufferItem(sender, id, Terminate))))
+      context.become(shutdown(consumers, Some(BufferItem(sender, id, Terminate))))
 
     case PersistentEvent(id, data) if (indexes.head - bufSize) < indexes.last =>
       buffer((indexes.head % bufSize).toInt) = BufferItem(sender, id, data)
       indexes(0) = indexes.head + 1
       log.debug(data.toString)
-      step(1, replaying, consumers)
+      step(1, consumers)
 
     case PersistentEvent(id, data) =>
       log.info(s"The event buffer is full! The $data is dropped.")
       sender ! Busy(id)
   }
 
-  def shutdown(consumers: Vector[List[Consumer]], replaying: Boolean, terminateItem: Option[BufferItem]): Receive = {
+  def shutdown(consumers: Vector[List[Consumer]], terminateItem: Option[BufferItem]): Receive = {
     case Processed(index, id) =>
       log.debug(s"Received processed message: Processed($index, $id), ${indexes.mkString}")
       consumers.flatten.find { c => c.processingIndex == index && c.actorPath == id } foreach {
@@ -61,10 +61,10 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
           val i = consumers.indexWhere(_.contains(c))
           val lastIndex = indexes(i)
           indexes(i) = consumers(i).minBy { _.index }.index
-          stepConsumer(indexes(i - 1), replaying, c)
+          stepConsumer(indexes(i - 1), c)
 
           if (i < indexes.size - 1) {
-            step(i + 1, replaying, consumers)
+            step(i + 1, consumers)
           } else {
             val range = (lastIndex until indexes(i))
             range.foreach { idx =>
@@ -82,7 +82,7 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
       }
   }
 
-  def stepConsumer(prevIndex: Long, replaying: Boolean, consumer: Consumer): Unit = {
+  def stepConsumer(prevIndex: Long, consumer: Consumer): Unit = {
     val cIndex = consumer.index
     val dif = cIndex - prevIndex
     if (dif <= 0) {
@@ -100,18 +100,18 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
             case 1 => buffer(firstIdx).data
             case _ => buffer.slice(firstIdx, maxIdx).map(_.data)
           }
-          log.debug(s"${Process(i, consumer.actorPath, replaying, data)}")
-          context.actorSelection(consumer.actorPath) ! Process(i, consumer.actorPath, replaying, data)
+          log.debug(s"${Process(i, consumer.actorPath, data)}")
+          context.actorSelection(consumer.actorPath) ! Process(i, consumer.actorPath, data)
         }
     }
   }
 
-  def step(index: Int, replaying: Boolean, consumers: Vector[List[Consumer]]): Unit = {
+  def step(index: Int, consumers: Vector[List[Consumer]]): Unit = {
     val prevIndex = indexes(index - 1)
     log.debug(s"Step: $index, $prevIndex")
 
     consumers(index).filter(_.processingIndex == -1L).foreach { c =>
-      stepConsumer(prevIndex, replaying, c)
+      stepConsumer(prevIndex, c)
     }
   }
 }
@@ -133,7 +133,7 @@ object Disruptor {
     var processingIndex = -1L
   }
   case class PersistentEvent(id: String, data: AnyRef)
-  case class Process(index: Long, id: String, replaying: Boolean, data: AnyRef)
+  case class Process(index: Long, id: String, data: AnyRef)
   case class Processed(index: Long, id: String)
   case class Busy(id: String)
   case class BufferItem(sender: ActorRef, id: String, data: AnyRef)

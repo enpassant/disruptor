@@ -30,7 +30,7 @@ class JournalActor extends Actor with ActorLogging {
     case ReplayNext(processor, disruptor) =>
       sendNext(1)
 
-    case Disruptor.Process(index, id, _, Array(others @ _*)) =>
+    case Disruptor.Process(index, id, Array(others @ _*)) =>
       val (replayed, remains) = others.filter {
         _ != Terminate
       } partition {
@@ -40,7 +40,7 @@ class JournalActor extends Actor with ActorLogging {
       if (replayed.size > 0) sender ! Disruptor.Processed(index - remains.size, id)
       log.debug(s"""In JournalActor - Replayed: ${replayed mkString ", "}""")
       log.debug(s"""In JournalActor - Remains: ${remains mkString ", "}""")
-      if (remains.size > 0) process(Disruptor.Process(index, id, false, remains))
+      if (remains.size > 0) process(Disruptor.Process(index, id, remains))
 
     case Disruptor.Processed(index, data) =>
       log.debug(s"In JournalActor - received process message: $index, $counter, $data")
@@ -56,14 +56,14 @@ class JournalActor extends Actor with ActorLogging {
       disruptor = d
       replay(count)
 
-    case Disruptor.Process(index, id, replaying, Terminate) =>
+    case Disruptor.Process(index, id, Terminate) =>
       sender ! Disruptor.Processed(index, id)
 
-    case Disruptor.Process(index, id, replaying, Replayed(data)) =>
+    case Disruptor.Process(index, id, Replayed(data)) =>
       log.debug(s"""In JournalActor - Replayed: $data""")
       sender ! Disruptor.Processed(index, id)
 
-    case Disruptor.Process(index, id, _, data: Seq[AnyRef]) =>
+    case Disruptor.Process(index, id, data: Seq[AnyRef]) =>
       log.debug(s"In JournalActor - received process message: $index, $data")
       val serializer = serialization.findSerializerFor(data)
       var i = index - data.size
@@ -83,7 +83,7 @@ class JournalActor extends Actor with ActorLogging {
       }
       sender ! Disruptor.Processed(index, id)
 
-    case Disruptor.Process(index, id, _, data) =>
+    case Disruptor.Process(index, id, data) =>
       log.debug(s"In JournalActor - received process message: $index, $data")
       val serializer = serialization.findSerializerFor(data)
       val bb = java.nio.ByteBuffer.allocate(8)
