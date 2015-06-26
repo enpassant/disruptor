@@ -7,6 +7,7 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
 
   val buffer = new Array[BufferItem](bufSize)
   var indexes = Array.empty[Long]
+  var seqNr = 0
 
   def receive = initialize(Array(Consumer(0, "")))
 
@@ -38,10 +39,11 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
 
   def events(consumers: Vector[List[Consumer]]): Receive = {
     case PersistentEvent(id, Terminate) =>
-      context.become(shutdown(consumers, Some(BufferItem(sender, id, Terminate))))
+      context.become(shutdown(consumers, Some(BufferItem(0, sender, id, Terminate))))
 
     case PersistentEvent(id, data) if (indexes.head - bufSize) < indexes.last =>
-      buffer((indexes.head % bufSize).toInt) = BufferItem(sender, id, data)
+      seqNr += 1
+      buffer((indexes.head % bufSize).toInt) = BufferItem(seqNr, sender, id, data)
       indexes(0) = indexes.head + 1
       log.debug(data.toString)
       step(1, consumers)
@@ -100,8 +102,9 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
             case 1 => buffer(firstIdx).data
             case _ => buffer.slice(firstIdx, maxIdx).map(_.data)
           }
-          log.debug(s"${Process(i, consumer.actorPath, data)}")
-          context.actorSelection(consumer.actorPath) ! Process(i, consumer.actorPath, data)
+          val process = Process(buffer(firstIdx).seqNr, i, consumer.actorPath, data)
+          log.debug(s"$process")
+          context.actorSelection(consumer.actorPath) ! process
         }
     }
   }
@@ -133,9 +136,9 @@ object Disruptor {
     var processingIndex = -1L
   }
   case class PersistentEvent(id: String, data: AnyRef)
-  case class Process(index: Long, id: String, data: AnyRef)
+  case class Process(seqNr: Long, index: Long, id: String, data: AnyRef)
   case class Processed(index: Long, id: String)
   case class Busy(id: String)
-  case class BufferItem(sender: ActorRef, id: String, data: AnyRef)
+  case class BufferItem(seqNr: Long, sender: ActorRef, id: String, data: AnyRef)
 }
 
