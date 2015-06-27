@@ -25,7 +25,9 @@ class BusinessProcessor extends Actor with ActorLogging {
 
   disruptor ! Initialized
 
-  def receive = {
+  def receive = replay orElse process
+
+  def replay: Receive = {
     case Initialized =>
       log.info(s"BusinessProcessor - Start replaying")
       journalActor ! Replay(self, disruptor, BufSize - 10)
@@ -37,11 +39,14 @@ class BusinessProcessor extends Actor with ActorLogging {
       log.info(s"BusinessProcessor - Start publishing")
       publishers foreach { _ ! disruptor }
       context.setReceiveTimeout(Duration.Undefined)
+      context.become(process)
 
     case ReplayFinished =>
       replaying = false
       context.setReceiveTimeout(1.second)
+  }
 
+  def process: Receive = {
     case Disruptor.Process(seqNr, index, id, data) =>
       sender ! Disruptor.Processed(index, id)
 
