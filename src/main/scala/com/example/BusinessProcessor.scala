@@ -3,7 +3,7 @@ package com.example
 import akka.actor.{Actor, ActorRef, ActorLogging, Props, ReceiveTimeout}
 import scala.concurrent.duration._
 
-class BusinessProcessor extends Actor with ActorLogging {
+abstract class BusinessProcessor extends Actor with ActorLogging {
   import JournalActor._
   import BusinessProcessor._
   import Disruptor._
@@ -24,6 +24,16 @@ class BusinessProcessor extends Actor with ActorLogging {
   disruptor ! Consumer(3, self.path.toString, 100)
 
   disruptor ! Initialized
+
+  def receiveCommand: Receive
+
+  def receiveRecover: Receive
+
+//  def persist(events: Seq[AnyRef])(handler: AnyRef => Unit): Unit = {
+//    events foreach { event =>
+//      disruptor ! PersistentEvent(counter.toString, event)
+//    }
+//  }
 
   def receive = replay orElse process
 
@@ -48,6 +58,7 @@ class BusinessProcessor extends Actor with ActorLogging {
 
   def process: Receive = {
     case Disruptor.Process(seqNr, index, id, data) =>
+      receiveRecover(data)
       sender ! Disruptor.Processed(index, id)
 
     case Disruptor.Processed(index, "TERM") =>
@@ -62,7 +73,7 @@ class BusinessProcessor extends Actor with ActorLogging {
 
 object BusinessProcessor {
   val BufSize = 1024 * 1024
-  val props = Props[BusinessProcessor]
+//  val props = Props[BusinessProcessor]
 
   case object SubscribePublisher
   case class PongMessage(text: String)

@@ -14,7 +14,7 @@ object ApplicationMain extends App {
 
   val random = new scala.util.Random
 
-  val businessProcessor = system.actorOf(BusinessProcessor.props, "businessProcessor")
+  val businessProcessor = system.actorOf(SampleBusinessProcessor.props, "businessProcessor")
 
   //journalActor ! JournalActor.Replay(businessProcessor, disruptor)
 
