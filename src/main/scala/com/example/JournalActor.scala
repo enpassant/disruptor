@@ -30,6 +30,10 @@ class JournalActor extends Actor with ActorLogging {
     case ReplayNext(processor, disruptor) =>
       sendNext(1)
 
+    case Disruptor.Process(0, index, id, command) =>
+      log.debug(s"In JournalActor - process command")
+      sender ! Disruptor.Processed(index, id)
+
     case Disruptor.Process(seqNr, index, id, Array(others @ _*)) =>
       val (replayed, remains) = others.filter {
         _ != Terminate
@@ -66,16 +70,18 @@ class JournalActor extends Actor with ActorLogging {
     case Disruptor.Process(seqNr, index, id, data: Seq[AnyRef]) =>
       log.debug(s"In JournalActor - received process message: $index, $data")
       val serializer = serialization.findSerializerFor(data)
-      var i = index - data.size
+//      var i = index - data.size
+      var i = seqNr
       val batch = db.createWriteBatch
       try {
         data foreach { d =>
-          i = i + 1
+          log.debug(s"In JournalActor save $i")
           val bb = java.nio.ByteBuffer.allocate(8)
           bb.putLong(i)
           batch.put(bb.array, serializer.toBinary(d))
-          if (counter != i) log.info(s"Key 1 is invalid. $i vs $counter")
           counter += 1
+          if (counter != i) log.info(s"Key 1 is invalid. $i vs $counter")
+          i = i + 1
         }
         db.write(batch)
       } finally {
@@ -84,13 +90,14 @@ class JournalActor extends Actor with ActorLogging {
       sender ! Disruptor.Processed(index, id)
 
     case Disruptor.Process(seqNr, index, id, data) =>
+      log.debug(s"In JournalActor save $seqNr")
       log.debug(s"In JournalActor - received process message: $index, $data")
       val serializer = serialization.findSerializerFor(data)
       val bb = java.nio.ByteBuffer.allocate(8)
-      bb.putLong(index)
+      bb.putLong(seqNr)
       db.put(bb.array, serializer.toBinary(data))
-      if (counter != index) log.info(s"Key 2 is invalid. $index vs $counter")
       counter += 1
+      if (counter != seqNr) log.info(s"Key 2 is invalid. $index vs $counter")
       sender ! Disruptor.Processed(index, id)
 
     case msg =>
@@ -108,18 +115,19 @@ class JournalActor extends Actor with ActorLogging {
         val bb = ByteBuffer.wrap(iter.peekNext().getKey())
         val key = bb.getLong
         val value = serializer.fromBinary(iter.peekNext().getValue())
+        log.debug(s"Replay: $key")
         value match {
           case array: Vector[AnyRef] =>
             log.debug(key+" = "+ (array mkString ", "))
             array foreach { msg =>
-              if (counter != key) log.info(s"Key 3 is invalid. $key vs $counter")
               counter += 1
+              if (counter != key) log.info(s"Key 3 is invalid. $key vs $counter")
               disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), self)
             }
           case msg: AnyRef =>
             log.debug(key+" = "+value)
-            if (counter != key) log.info(s"Key 4 is invalid. $key vs $counter")
             counter += 1
+            if (counter != key) log.info(s"Key 4 is invalid. $key vs $counter")
             disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), self)
         }
         iter.next()
@@ -130,7 +138,8 @@ class JournalActor extends Actor with ActorLogging {
         // Make sure you close the iterator to avoid resource leaks.
         iter.close()
         iterator = None
-        processor ! ReplayFinished
+        disruptor.tell(ReplayFinished, self)
+//        processor ! ReplayFinished
       }
     }
   }
@@ -150,7 +159,7 @@ object JournalActor {
   val props = Props[JournalActor]
 
   case object Initialize
-  case object ReplayFinished
+  case object ReplayFinished extends Disruptor.Command
   case class Replayed(msg: AnyRef)
   case class Replay(processor: ActorRef, disruptor: ActorRef, count: Long)
   case class ReplayNext(processor: ActorRef, disruptor: ActorRef)

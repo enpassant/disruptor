@@ -38,6 +38,13 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
     events(consumers) orElse shutdown(consumers, None)
 
   def events(consumers: Vector[List[Consumer]]): Receive = {
+    case data: Command =>
+      log.debug(s"Received command message: $data")
+      buffer((indexes.head % bufSize).toInt) = BufferItem(0, sender, data.toString, data)
+      indexes(0) = indexes.head + 1
+      log.debug(data.toString)
+      step(1, consumers)
+
     case PersistentEvent(id, Terminate) =>
       context.become(shutdown(consumers, Some(BufferItem(0, sender, id, Terminate))))
 
@@ -49,7 +56,7 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
       step(1, consumers)
 
     case PersistentEvent(id, data) =>
-      log.info(s"The event buffer is full! The $data is dropped.")
+      log.debug(s"The event buffer is full! The $data is dropped.")
       sender ! Busy(id)
   }
 
@@ -89,20 +96,23 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
     val dif = cIndex - prevIndex
     if (dif <= 0) {
         if (prevIndex > cIndex) {
-//          val i = prevIndex - 1
-//          val i = cIndex
           val i1 = prevIndex.min(cIndex + consumer.maxCount) - 1
           val firstIdx = (cIndex % bufSize).toInt
           val idx = (i1 % bufSize).toInt
           val maxIdx = if (firstIdx > idx) bufSize else idx + 1
           val i = cIndex + maxIdx - firstIdx - 1
-//          val i = i1
-          consumer.processingIndex = i
-          val data = (maxIdx - firstIdx) match {
-            case 1 => buffer(firstIdx).data
-            case _ => buffer.slice(firstIdx, maxIdx).map(_.data)
+          val firstSeqNr = buffer(firstIdx).seqNr
+          val (data, count) = firstSeqNr match {
+            case 0 => (buffer(firstIdx).data, 1)
+            case _ => (maxIdx - firstIdx) match {
+              case 1 => (buffer(firstIdx).data, 1)
+              case _ =>
+                val seq = buffer.slice(firstIdx, maxIdx).takeWhile(_.seqNr > 0).map(_.data)
+                (seq, seq.size)
+            }
           }
-          val process = Process(buffer(firstIdx).seqNr, i, consumer.actorPath, data)
+          consumer.processingIndex = cIndex + count - 1
+          val process = Process(firstSeqNr, consumer.processingIndex, consumer.actorPath, data)
           log.debug(s"$process")
           context.actorSelection(consumer.actorPath) ! process
         }

@@ -45,15 +45,15 @@ abstract class BusinessProcessor extends Actor with ActorLogging {
     case SubscribePublisher =>
       publishers = publishers ++ List(sender)
 
-    case ReceiveTimeout =>
-      log.info(s"BusinessProcessor - Start publishing")
-      publishers foreach { _ ! disruptor }
-      context.setReceiveTimeout(Duration.Undefined)
-      context.become(process)
-
-    case ReplayFinished =>
-      replaying = false
-      context.setReceiveTimeout(1.second)
+    case Disruptor.Process(0, index, id, command) =>
+      command match {
+        case ReplayFinished =>
+          log.info(s"BusinessProcessor - Start publishing")
+          publishers foreach { _ ! disruptor }
+          context.setReceiveTimeout(Duration.Undefined)
+          sender ! Disruptor.Processed(index, id)
+          context.become(process)
+      }
   }
 
   def process: Receive = {
