@@ -61,7 +61,7 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
   }
 
   def shutdown(consumers: Vector[List[Consumer]], terminateItem: Option[BufferItem]): Receive = {
-    case Processed(index, id) =>
+    case Processed(index, id, data) =>
       log.debug(s"Received processed message: Processed($index, $id), ${indexes.mkString}")
       consumers.flatten.find { c => c.processingIndex == index && c.actorPath == id } foreach {
         c =>
@@ -78,13 +78,14 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
             val range = (lastIndex until indexes(i))
             range.foreach { idx =>
               val bufferItem = buffer((idx % bufSize).toInt)
-              log.debug(s"Full processed: ${Processed(idx, bufferItem.id)}")
-              bufferItem.sender ! Processed(idx, bufferItem.id)
+              val processed = Processed(idx, bufferItem.id, bufferItem.data)
+              log.debug(s"Full processed: $processed")
+              bufferItem.sender ! processed
             }
 
             if (indexes(0) == indexes(i)) {
               terminateItem foreach { bufferItem =>
-                bufferItem.sender ! Processed(indexes(0), bufferItem.id)
+                bufferItem.sender ! Processed(indexes(0), bufferItem.id, bufferItem.data)
               }
             }
           }
@@ -147,7 +148,7 @@ object Disruptor {
   }
   case class PersistentEvent(id: String, data: AnyRef)
   case class Process(seqNr: Long, index: Long, id: String, data: AnyRef)
-  case class Processed(index: Long, id: String)
+  case class Processed(index: Long, id: String, data: AnyRef)
   case class Busy(id: String)
   case class BufferItem(seqNr: Long, sender: ActorRef, id: String, data: AnyRef)
 }

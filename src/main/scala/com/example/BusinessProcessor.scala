@@ -29,10 +29,8 @@ abstract class BusinessProcessor extends Actor with ActorLogging {
 
   def receiveRecover: Receive
 
-//  def persist(events: Seq[AnyRef])(handler: AnyRef => Unit): Unit = {
-//    events foreach { event =>
-//      disruptor ! PersistentEvent(counter.toString, event)
-//    }
+//  def persist(event: AnyRef)(handler: AnyRef => Unit): Unit = {
+//    disruptor ! PersistentEvent(counter.toString, event)
 //  }
 
   def receive = replay orElse process
@@ -50,22 +48,22 @@ abstract class BusinessProcessor extends Actor with ActorLogging {
         case ReplayFinished =>
           log.info(s"BusinessProcessor - Start publishing")
           publishers foreach { _ ! disruptor }
-          context.setReceiveTimeout(Duration.Undefined)
-          sender ! Disruptor.Processed(index, id)
-          context.become(process)
+          sender ! Disruptor.Processed(index, id, command)
+          context.become(process orElse receiveCommand)
       }
   }
 
   def process: Receive = {
     case Disruptor.Process(seqNr, index, id, data) =>
       receiveRecover(data)
-      sender ! Disruptor.Processed(index, id)
+      sender ! Disruptor.Processed(index, id, data)
 
-    case Disruptor.Processed(index, "TERM") =>
+    case Disruptor.Processed(index, "Terminate", Terminate) =>
       log.info(s"In PongActor - TERMINATED. Processed: $index, $counter")
       context.system.shutdown
 
-    case Disruptor.Processed(index, data) =>
+    case Disruptor.Processed(index, id, data) =>
+      receiveRecover(data)
       counter += 1
       log.debug(s"In PongActor - received process message: $index, $counter, $data")
   }

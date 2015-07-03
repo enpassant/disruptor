@@ -4,10 +4,14 @@ import akka.actor.{Actor, ActorRef, ActorLogging, Props, ReceiveTimeout}
 import scala.concurrent.duration._
 
 class SampleBusinessProcessor extends BusinessProcessor with ActorLogging {
+  import Disruptor._
+
   var msgCount = 0
 
   def receiveCommand: Receive = {
-    case msg =>
+    case msg: AnyRef =>
+      log.debug(s"In SampleBusinessProcessor - received message: $msg")
+      disruptor ! PersistentEvent(msg.toString, msg)
   }
 
   def receiveRecover: Receive = {

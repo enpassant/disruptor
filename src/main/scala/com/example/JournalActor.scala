@@ -32,7 +32,7 @@ class JournalActor extends Actor with ActorLogging {
 
     case Disruptor.Process(0, index, id, command) =>
       log.debug(s"In JournalActor - process command")
-      sender ! Disruptor.Processed(index, id)
+      sender ! Disruptor.Processed(index, id, command)
 
     case Disruptor.Process(seqNr, index, id, Array(others @ _*)) =>
       val (replayed, remains) = others.filter {
@@ -41,12 +41,12 @@ class JournalActor extends Actor with ActorLogging {
         case Replayed(elem) => true
         case _ => false
       }
-      if (replayed.size > 0) sender ! Disruptor.Processed(index - remains.size, id)
+      if (replayed.size > 0) sender ! Disruptor.Processed(index - remains.size, id, replayed)
       log.debug(s"""In JournalActor - Replayed: ${replayed mkString ", "}""")
       log.debug(s"""In JournalActor - Remains: ${remains mkString ", "}""")
       if (remains.size > 0) process(Disruptor.Process(seqNr, index, id, remains))
 
-    case Disruptor.Processed(index, data) =>
+    case Disruptor.Processed(index, id, data) =>
       log.debug(s"In JournalActor - received process message: $index, $counter, $data")
       sendNext(1)
 
@@ -61,11 +61,11 @@ class JournalActor extends Actor with ActorLogging {
       replay(count)
 
     case Disruptor.Process(seqNr, index, id, Terminate) =>
-      sender ! Disruptor.Processed(index, id)
+      sender ! Disruptor.Processed(index, id, Terminate)
 
     case Disruptor.Process(seqNr, index, id, Replayed(data)) =>
       log.debug(s"""In JournalActor - Replayed: $data""")
-      sender ! Disruptor.Processed(index, id)
+      sender ! Disruptor.Processed(index, id, Replayed(data))
 
     case Disruptor.Process(seqNr, index, id, data: Seq[AnyRef]) =>
       log.debug(s"In JournalActor - received process message: $index, $data")
@@ -87,7 +87,7 @@ class JournalActor extends Actor with ActorLogging {
       } finally {
         batch.close
       }
-      sender ! Disruptor.Processed(index, id)
+      sender ! Disruptor.Processed(index, id, data)
 
     case Disruptor.Process(seqNr, index, id, data) =>
       log.debug(s"In JournalActor save $seqNr")
@@ -98,7 +98,7 @@ class JournalActor extends Actor with ActorLogging {
       db.put(bb.array, serializer.toBinary(data))
       counter += 1
       if (counter != seqNr) log.info(s"Key 2 is invalid. $index vs $counter")
-      sender ! Disruptor.Processed(index, id)
+      sender ! Disruptor.Processed(index, id, data)
 
     case msg =>
       log.debug(s"In JournalActor - received message: $msg")

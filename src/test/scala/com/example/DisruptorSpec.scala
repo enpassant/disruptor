@@ -139,7 +139,7 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       probe1.expectMsg(100.millis, Process(1, 0, path1, data))
       probe2.expectMsg(100.millis, Process(1, 0, path2, data))
-      probe1.ref ! Processed(0, path1)
+      probe1.ref ! Processed(0, path1, data)
       probe3.expectNoMsg(100.millis)
     }
 
@@ -156,8 +156,8 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       probe1.expectMsg(100.millis, Process(1, 0, path1, data))
       probe2.expectMsg(100.millis, Process(1, 0, path2, data))
-      disruptor ! Processed(0, path1)
-      disruptor ! Processed(0, path2)
+      disruptor ! Processed(0, path1, data)
+      disruptor ! Processed(0, path2, data)
       probe3.expectMsg(100.millis, Process(1, 0, path3, data))
     }
 
@@ -174,11 +174,11 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       probe1.expectMsg(100.millis, Process(1, 0, path1, data))
       probe2.expectMsg(100.millis, Process(1, 0, path2, data))
-      disruptor ! Processed(0, path1)
-      disruptor ! Processed(0, path2)
+      disruptor ! Processed(0, path1, data)
+      disruptor ! Processed(0, path2, data)
       probe3.expectMsg(100.millis, Process(1, 0, path3, data))
-      disruptor ! Processed(0, path3)
-      expectMsg(100.millis, Processed(0, "1"))
+      disruptor ! Processed(0, path3, data)
+      expectMsg(100.millis, Processed(0, "1", data))
     }
 
     "answer Processed event when all consumers processed inorder" in {
@@ -194,19 +194,19 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       probe1.expectMsg(100.millis, Process(1, 0, path1, data))
       probe2.expectMsg(100.millis, Process(1, 0, path2, data))
-      disruptor ! Processed(0, path1)
+      disruptor ! Processed(0, path1, data)
       disruptor ! PersistentEvent("1", data)
       probe1.expectMsg(100.millis, Process(2, 1, path1, data))
-      disruptor ! Processed(0, path2)
+      disruptor ! Processed(0, path2, data)
       probe2.expectMsg(100.millis, Process(2, 1, path2, data))
       probe3.expectMsg(100.millis, Process(1, 0, path3, data))
-      disruptor ! Processed(0, path3)
-      expectMsg(100.millis, Processed(0, "0"))
-      disruptor ! Processed(1, path1)
-      disruptor ! Processed(1, path2)
+      disruptor ! Processed(0, path3, data)
+      expectMsg(100.millis, Processed(0, "0", data))
+      disruptor ! Processed(1, path1, data)
+      disruptor ! Processed(1, path2, data)
       probe3.expectMsg(100.millis, Process(2, 1, path3, data))
-      disruptor ! Processed(1, path3)
-      expectMsg(100.millis, Processed(1, "1"))
+      disruptor ! Processed(1, path3, data)
+      expectMsg(100.millis, Processed(1, "1", data))
     }
 
     "answer Processed event when all consumers processed inorder 2" in {
@@ -222,19 +222,19 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       probe1.expectMsg(100.millis, Process(1, 0, path1, data))
       probe2.expectMsg(100.millis, Process(1, 0, path2, data))
-      disruptor ! Processed(0, path1)
+      disruptor ! Processed(0, path1, data)
       disruptor ! PersistentEvent("1", data)
       probe1.expectMsg(100.millis, Process(2, 1, path1, data))
-      disruptor ! Processed(0, path2)
+      disruptor ! Processed(0, path2, data)
       probe2.expectMsg(100.millis, Process(2, 1, path2, data))
       probe3.expectMsg(100.millis, Process(1, 0, path3, data))
-      disruptor ! Processed(1, path1)
-      disruptor ! Processed(1, path2)
-      disruptor ! Processed(0, path3)
+      disruptor ! Processed(1, path1, data)
+      disruptor ! Processed(1, path2, data)
+      disruptor ! Processed(0, path3, data)
       probe3.expectMsg(100.millis, Process(2, 1, path3, data))
-      expectMsg(100.millis, Processed(0, "0"))
-      disruptor ! Processed(1, path3)
-      expectMsg(100.millis, Processed(1, "1"))
+      expectMsg(100.millis, Processed(0, "0", data))
+      disruptor ! Processed(1, path3, data)
+      expectMsg(100.millis, Processed(1, "1", data))
     }
 
     "answer many Processed event when all consumers processed" in {
@@ -252,11 +252,11 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
         probe1.expectMsg(100.millis, Process(i + 1, i, path1, data))
         probe2.expectMsg(100.millis, Process(i + 1, i, path2, data))
-        disruptor ! Processed(i, path1)
-        disruptor ! Processed(i, path2)
+        disruptor ! Processed(i, path1, data)
+        disruptor ! Processed(i, path2, data)
         probe3.expectMsg(100.millis, Process(i + 1, i, path3, data))
-        disruptor ! Processed(i, path3)
-        expectMsg(100.millis, Processed(i, i.toString))
+        disruptor ! Processed(i, path3, data)
+        expectMsg(100.millis, Processed(i, i.toString, data))
       }
     }
   }

@@ -5,7 +5,7 @@ import Disruptor._
 import PingActor._
 import scala.concurrent.duration._
 import akka.util.Timeout
-import akka.pattern.ask
+import akka.pattern.{ask, pipe}
 
 object ApplicationMain extends App {
   val system = ActorSystem("MyActorSystem")
@@ -16,9 +16,6 @@ object ApplicationMain extends App {
 
   val businessProcessor = system.actorOf(SampleBusinessProcessor.props, "businessProcessor")
 
-  //journalActor ! JournalActor.Replay(businessProcessor, disruptor)
-
-  //Thread.sleep(30000)
   val futureDisruptor = businessProcessor ? BusinessProcessor.SubscribePublisher
 
   businessProcessor ! Disruptor.Initialized
@@ -28,10 +25,11 @@ object ApplicationMain extends App {
   }
 
   futureDisruptor onSuccess { case disruptor: ActorRef =>
-    for (i <- 0 until 500000) {
-      disruptor.tell(PersistentEvent(i.toString, PingMessage(i.toString)), businessProcessor)
-    }
-    disruptor.tell(PersistentEvent("TERM", Terminate), businessProcessor)
+    val sampleClient = system.actorOf(SampleClient.props(businessProcessor), "sampleClient")
+//    for (i <- 0 until 10) {
+//      disruptor.tell(PersistentEvent(i.toString, PingMessage(i.toString)), businessProcessor)
+//    }
+//    disruptor.tell(PersistentEvent("TERM", Terminate), businessProcessor)
   }
 
   system.awaitTermination()
