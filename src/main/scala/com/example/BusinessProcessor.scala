@@ -1,12 +1,18 @@
 package com.example
 
 import akka.actor.{Actor, ActorRef, ActorLogging, Props, ReceiveTimeout}
+import akka.pattern.{ask, pipe}
+import akka.util.Timeout
 import scala.concurrent.duration._
+import scala.concurrent._
 
 abstract class BusinessProcessor extends Actor with ActorLogging {
   import JournalActor._
   import BusinessProcessor._
   import Disruptor._
+
+  implicit val timeout = Timeout(60.seconds)
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   val random = new scala.util.Random
   var counter = 0
@@ -24,6 +30,10 @@ abstract class BusinessProcessor extends Actor with ActorLogging {
   disruptor ! Consumer(3, self.path.toString, 100)
 
   disruptor ! Initialized
+
+  def persist[T](msg: AnyRef): Future[Any] = {
+    disruptor ? PersistentEvent(msg.toString, msg)
+  }
 
   def receiveCommand: Receive
 
