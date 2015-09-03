@@ -9,20 +9,97 @@ import java.nio.ByteBuffer
 
 import Disruptor._
 
+trait JournalerDBIterator {
+  val serializer: Serializer
+
+  def hasNext: Boolean
+  def read: (Long, AnyRef)
+  def close(): Unit
+}
+
+trait JournalerDB {
+  val serialization: Serialization
+
+  def writeData(seqNr: Long, data: AnyRef): Unit
+  def writeSeqData(seqNr: Long, data: Seq[AnyRef]): Unit
+  def iterator: JournalerDBIterator
+}
+
+trait Journaler {
+  def init(serialization: Serialization): JournalerDB
+}
+
+class LevelDBJournaler extends Journaler {
+  def init(serialization: Serialization) = {
+    val options = new Options()
+    options.createIfMissing(true)
+    val db = factory.open(new File("/tmp/example.bin"), options)
+    new LevelDBJournalerDB(serialization, db)
+  }
+}
+
+class LevelDBJournalerDB(val serialization: Serialization, val db: DB)
+  extends JournalerDB {
+  def iterator = {
+    val iter = db.iterator
+    iter.seekToFirst()
+    val serializer = serialization.findSerializerFor("data")
+    new LevelDBJournalerDBIterator(serializer, iter)
+  }
+
+  def writeData(seqNr: Long, data: AnyRef): Unit = {
+    val serializer = serialization.findSerializerFor(data)
+    val bb = java.nio.ByteBuffer.allocate(8)
+    bb.putLong(seqNr)
+    db.put(bb.array, serializer.toBinary(data))
+  }
+
+  def writeSeqData(seqNr: Long, data: Seq[AnyRef]): Unit = {
+    var i = seqNr
+    val batch = db.createWriteBatch
+    val serializer = serialization.findSerializerFor(data)
+    try {
+      data foreach { d =>
+        //log.debug(s"In JournalActor save $i")
+        val bb = java.nio.ByteBuffer.allocate(8)
+        bb.putLong(i)
+        batch.put(bb.array, serializer.toBinary(d))
+        //if (counter != i) log.info(s"Key 1 is invalid. $i vs $counter")
+        i = i + 1
+      }
+      db.write(batch)
+    } finally {
+      batch.close
+    }
+  }
+}
+
+class LevelDBJournalerDBIterator(val serializer: Serializer, val dbIterator: DBIterator)
+  extends JournalerDBIterator {
+  def hasNext = dbIterator.hasNext
+
+  def read: (Long, AnyRef) = {
+    val bb = ByteBuffer.wrap(dbIterator.peekNext().getKey())
+    val key = bb.getLong
+    val value = serializer.fromBinary(dbIterator.peekNext().getValue())
+    dbIterator.next()
+    (key, value)
+  }
+
+  def close() = dbIterator.close
+}
+
 class JournalActor extends Actor with ActorLogging {
   import JournalActor._
 
   val random = new scala.util.Random
   var counter = 0L
 
-  val options = new Options();
-  options.createIfMissing(true);
-  val db = factory.open(new File("/tmp/example.bin"), options);
-
+  val journaler = new LevelDBJournaler
   val serialization = SerializationExtension(context.system)
-  val data = PingMessage("test")
-  val serializer = serialization.findSerializerFor(data)
-  var iterator: Option[DBIterator] = None
+  val db = journaler.init(serialization)
+
+  var iterator: Option[JournalerDBIterator] = None
   var disruptor: ActorRef = _
   var processor: ActorRef = _
 
@@ -67,35 +144,18 @@ class JournalActor extends Actor with ActorLogging {
       log.debug(s"""In JournalActor - Replayed: $data""")
       sender ! Disruptor.Processed(index, id, Replayed(data))
 
-    case Disruptor.Process(seqNr, index, id, data: Seq[AnyRef]) =>
+    case Disruptor.Process(seqNr, index, id, data: Seq[AnyRef @unchecked]) =>
       log.debug(s"In JournalActor - received process message: $index, $data")
       val serializer = serialization.findSerializerFor(data)
 //      var i = index - data.size
-      var i = seqNr
-      val batch = db.createWriteBatch
-      try {
-        data foreach { d =>
-          log.debug(s"In JournalActor save $i")
-          val bb = java.nio.ByteBuffer.allocate(8)
-          bb.putLong(i)
-          batch.put(bb.array, serializer.toBinary(d))
-          counter += 1
-          if (counter != i) log.info(s"Key 1 is invalid. $i vs $counter")
-          i = i + 1
-        }
-        db.write(batch)
-      } finally {
-        batch.close
-      }
+      db.writeSeqData(seqNr, data)
+      counter += data.length
       sender ! Disruptor.Processed(index, id, data)
 
     case Disruptor.Process(seqNr, index, id, data) =>
       log.debug(s"In JournalActor save $seqNr")
       log.debug(s"In JournalActor - received process message: $index, $data")
-      val serializer = serialization.findSerializerFor(data)
-      val bb = java.nio.ByteBuffer.allocate(8)
-      bb.putLong(seqNr)
-      db.put(bb.array, serializer.toBinary(data))
+      db.writeData(seqNr, data)
       counter += 1
       if (counter != seqNr) log.info(s"Key 2 is invalid. $index vs $counter")
       sender ! Disruptor.Processed(index, id, data)
@@ -112,12 +172,10 @@ class JournalActor extends Actor with ActorLogging {
       var i = 0
       while (iter.hasNext && i < count) {
         i += 1
-        val bb = ByteBuffer.wrap(iter.peekNext().getKey())
-        val key = bb.getLong
-        val value = serializer.fromBinary(iter.peekNext().getValue())
+        val (key, value) = iter.read
         log.debug(s"Replay: $key")
         value match {
-          case array: Vector[AnyRef] =>
+          case array: Vector[AnyRef @unchecked] =>
             log.debug(key+" = "+ (array mkString ", "))
             array foreach { msg =>
               counter += 1
@@ -130,13 +188,12 @@ class JournalActor extends Actor with ActorLogging {
             if (counter != key) log.info(s"Key 4 is invalid. $key vs $counter")
             disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), self)
         }
-        iter.next()
       }
       if (!iter.hasNext) {
         log.info(s"Close Replay: $counter")
 
         // Make sure you close the iterator to avoid resource leaks.
-        iter.close()
+        iter.close
         iterator = None
         disruptor.tell(ReplayFinished, self)
 //        processor ! ReplayFinished
@@ -147,9 +204,7 @@ class JournalActor extends Actor with ActorLogging {
   def replay(count: Long) = {
     log.debug("Start replay")
 
-    val iter = db.iterator()
-    iter.seekToFirst()
-    log.debug(s"isNext: ${iter.hasNext}")
+    val iter = db.iterator
     iterator = Some(iter)
     sendNext(count)
   }
