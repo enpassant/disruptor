@@ -15,7 +15,8 @@ class JournalActor extends Actor with ActorLogging {
   val random = new scala.util.Random
   var counter = 0L
 
-  val journaler = new LevelDBJournaler
+  //val journaler = new LevelDBJournaler
+  val journaler = new FileJournaler("/tmp/example.bin")
   val serialization = SerializationExtension(context.system)
   val db = journaler.init(serialization)
 
