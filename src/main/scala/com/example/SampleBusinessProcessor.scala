@@ -23,6 +23,9 @@ class SampleBusinessProcessor extends BusinessProcessor with ActorLogging {
   }
 
   def receiveRecover: Receive = {
+    case JournalActor.Replayed(msg: AnyRef) =>
+      log.info(s"AuditoriumBusinessProcessor - receiveRecover replayed: $msg")
+
     case msg =>
       msgCount += 1
   }

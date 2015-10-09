@@ -65,7 +65,10 @@ abstract class BusinessProcessor extends Actor with ActorLogging {
 
   def process: Receive = {
     case Disruptor.Process(seqNr, index, id, data) =>
-      receiveRecover(data)
+      data match {
+        case Array(seq @ _*) => seq foreach receiveRecover
+        case _ => receiveRecover(data)
+      }
       sender ! Disruptor.Processed(index, id, data)
 
     case Disruptor.Processed(index, "Terminate", Terminate) =>
@@ -73,7 +76,6 @@ abstract class BusinessProcessor extends Actor with ActorLogging {
       context.system.shutdown
 
     case Disruptor.Processed(index, id, data) =>
-      receiveRecover(data)
       counter += 1
       log.debug(s"In PongActor - received process message: $index, $counter, $data")
   }
