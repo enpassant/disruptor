@@ -11,7 +11,7 @@ class SampleClient(businessProcessor: ActorRef) extends Actor with ActorLogging 
 
   log.info(s"In SampleClient - send events")
 
-  for (i <- 0 until 500000) {
+  for (i <- 0 until 5) {
     businessProcessor ! PingMessage(i.toString)
   }
   businessProcessor ! Terminate

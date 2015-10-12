@@ -12,7 +12,7 @@ class SampleBusinessProcessor extends BusinessProcessor with ActorLogging {
 
   def receiveCommand: Receive = {
     case msg: AnyRef =>
-      log.debug(s"In SampleBusinessProcessor - received message: $msg")
+      //log.debug(s"In SampleBusinessProcessor - received message: $msg")
       disruptor ! PersistentEvent(msg.toString, msg)
       //val sndr = sender
       //persist(msg) map {
@@ -24,7 +24,7 @@ class SampleBusinessProcessor extends BusinessProcessor with ActorLogging {
 
   def receiveRecover: Receive = {
     case JournalActor.Replayed(msg: AnyRef) =>
-      log.info(s"AuditoriumBusinessProcessor - receiveRecover replayed: $msg")
+      //log.info(s"AuditoriumBusinessProcessor - receiveRecover replayed: $msg")
 
     case msg =>
       msgCount += 1

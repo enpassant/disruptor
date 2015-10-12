@@ -1,11 +1,12 @@
 package com.example
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.actor.{Actor, ActorContext, ActorLogging, ActorRef, PoisonPill, Props}
 import java.io._
 import akka.serialization._
 import java.nio.ByteBuffer
 
 import Disruptor._
+import JournalActor._
 
 class FileJournaler(val fileName: String) extends Journaler {
   def init(serialization: Serialization) = {
@@ -17,6 +18,12 @@ class FileJournalerDB(val serialization: Serialization, val fileName: String)
   extends JournalerDB {
 
   val outputStream = new BufferedOutputStream(new FileOutputStream(fileName, true))
+
+  def actor(context: ActorContext) = {
+    val inputStream = new BufferedInputStream(new FileInputStream(fileName))
+    val serializer = serialization.findSerializerFor("data")
+    context.actorOf(FileJournaler.props(serializer, inputStream))
+  }
 
   def iterator = {
     val inputStream = new BufferedInputStream(new FileInputStream(fileName))
@@ -54,8 +61,59 @@ class FileJournalerDB(val serialization: Serialization, val fileName: String)
   }
 }
 
-class FileJournalerDBIterator(val serializer: Serializer, val inputStream: InputStream)
-  extends JournalerDBIterator {
+class FileJournalerActor(val serializer: Serializer, val inputStream: InputStream)
+  extends Actor with ActorLogging {
+
+  var iter = new FileJournalerDBIterator(serializer, inputStream)
+  var counter = 0
+
+  def sendNext(count: Long, disruptor: ActorRef) = {
+    log.debug("sendNext")
+
+    log.debug(s"isNext: ${iter.hasNext}")
+    var i = 0
+    while (iter.hasNext && i < count) {
+      i += 1
+      val (key, value) = iter.read
+      log.debug(s"Replay: $key")
+      value match {
+        case array: Vector[AnyRef @unchecked] =>
+          log.debug(key+" = "+ (array mkString ", "))
+          array foreach { msg =>
+            counter += 1
+            if (counter != key) log.info(s"Key 3 is invalid. $key vs $counter")
+            disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), context.parent)
+          }
+        case msg: AnyRef =>
+          log.debug(key+" = "+value)
+          counter += 1
+          if (counter != key) log.info(s"Key 4 is invalid. $key vs $counter")
+          disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), context.parent)
+      }
+    }
+    if (!iter.hasNext) {
+      log.info(s"Close Replay: $counter")
+
+      disruptor.tell(ReplayFinished, context.parent)
+      context.become(finished)
+    }
+  }
+
+  def receive = {
+    case Replay(processor, disruptor, count) =>
+      sendNext(count, disruptor)
+
+    case ReplayNext(processor, disruptor) =>
+      sendNext(1, disruptor)
+  }
+
+  def finished: Receive = {
+    case PoisonPill =>
+      iter.close
+  }
+}
+
+class FileJournalerDBIterator(val serializer: Serializer, val inputStream: InputStream) {
   var index = 0L
 
   def hasNext = inputStream.available > 0
@@ -73,4 +131,9 @@ class FileJournalerDBIterator(val serializer: Serializer, val inputStream: Input
   }
 
   def close() = inputStream.close
+}
+
+object FileJournaler {
+  def props(serializer: Serializer, inputStream: InputStream) =
+    Props(new FileJournalerActor(serializer, inputStream))
 }

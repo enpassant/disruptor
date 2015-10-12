@@ -1,6 +1,6 @@
 package com.example
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.actor.{Actor, ActorContext, ActorLogging, ActorRef, Props}
 import org.iq80.leveldb._
 import org.fusesource.leveldbjni.JniDBFactory._
 import java.io._
@@ -20,6 +20,8 @@ class LevelDBJournaler extends Journaler {
 
 class LevelDBJournalerDB(val serialization: Serialization, val db: DB)
   extends JournalerDB {
+  def actor(context: ActorContext): ActorRef = ???
+
   def iterator = {
     val iter = db.iterator
     iter.seekToFirst()
@@ -54,8 +56,7 @@ class LevelDBJournalerDB(val serialization: Serialization, val db: DB)
   }
 }
 
-class LevelDBJournalerDBIterator(val serializer: Serializer, val dbIterator: DBIterator)
-  extends JournalerDBIterator {
+class LevelDBJournalerDBIterator(val serializer: Serializer, val dbIterator: DBIterator) {
   def hasNext = dbIterator.hasNext
 
   def read: (Long, AnyRef) = {

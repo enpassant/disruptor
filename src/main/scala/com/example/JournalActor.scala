@@ -19,115 +19,75 @@ class JournalActor extends Actor with ActorLogging {
   val journaler = new FileJournaler("/tmp/example.bin")
   val serialization = SerializationExtension(context.system)
   val db = journaler.init(serialization)
+  val actor = db.actor(context)
 
-  var iterator: Option[JournalerDBIterator] = None
   var disruptor: ActorRef = _
   var processor: ActorRef = _
 
-  def receive = {
+  def receive: PartialFunction[Any, Unit] = {
     case ReplayNext(processor, disruptor) =>
-      sendNext(1)
+      actor ! ReplayNext(processor, disruptor)
 
-    case Disruptor.Process(0, index, id, command) =>
+    case Process(0, index, id, command) =>
       log.debug(s"In JournalActor - process command")
-      sender ! Disruptor.Processed(index, id, command)
+      sender ! Processed(index, id, command)
 
-    case Disruptor.Process(seqNr, index, id, Array(others @ _*)) =>
+    case Process(seqNr, index, id, Array(others @ _*)) =>
       val (replayed, remains) = others.filter {
         _ != Terminate
       } partition {
         case Replayed(elem) => true
         case _ => false
       }
-      if (replayed.size > 0) sender ! Disruptor.Processed(index - remains.size, id, replayed)
+      if (replayed.size > 0) sender ! Processed(index - remains.size, id, replayed)
       log.debug(s"""In JournalActor - Replayed: ${replayed mkString ", "}""")
       log.debug(s"""In JournalActor - Remains: ${remains mkString ", "}""")
-      if (remains.size > 0) process(Disruptor.Process(seqNr, index, id, remains))
+      if (remains.size > 0) process(Process(seqNr, index, id, remains))
 
-    case Disruptor.Processed(index, id, data) =>
+    case Processed(index, id, command: Command) =>
+      log.debug(s"In JournalActor - received command message: $index, $counter, $command")
+
+    case Processed(index, id, data) =>
       log.debug(s"In JournalActor - received process message: $index, $counter, $data")
-      sendNext(1)
+      counter += 1
 
     case msg =>
       process(msg)
   }
 
-  def process: Receive = {
+  def process: PartialFunction[Any, Unit] = {
     case Replay(p, d, count) =>
+      log.debug("Start replay")
+
       processor = p
       disruptor = d
-      replay(count)
+      actor ! Replay(p, d, count)
 
-    case Disruptor.Process(seqNr, index, id, Terminate) =>
-      sender ! Disruptor.Processed(index, id, Terminate)
+    case Process(seqNr, index, id, Terminate) =>
+      sender ! Processed(index, id, Terminate)
 
-    case Disruptor.Process(seqNr, index, id, Replayed(data)) =>
+    case Process(seqNr, index, id, Replayed(data)) =>
       log.debug(s"""In JournalActor - Replayed: $data""")
-      sender ! Disruptor.Processed(index, id, Replayed(data))
+      sender ! Processed(index, id, Replayed(data))
 
-    case Disruptor.Process(seqNr, index, id, data: Seq[AnyRef @unchecked]) =>
+    case Process(seqNr, index, id, data: Seq[AnyRef @unchecked]) =>
       log.debug(s"In JournalActor - received process message: $index, $data")
       val serializer = serialization.findSerializerFor(data)
 //      var i = index - data.size
       db.writeSeqData(seqNr, data)
       counter += data.length
-      sender ! Disruptor.Processed(index, id, data)
+      sender ! Processed(index, id, data)
 
-    case Disruptor.Process(seqNr, index, id, data) =>
+    case Process(seqNr, index, id, data) =>
       log.debug(s"In JournalActor save $seqNr")
       log.debug(s"In JournalActor - received process message: $index, $data")
       db.writeData(seqNr, data)
       counter += 1
       if (counter != seqNr) log.info(s"Key 2 is invalid. $index vs $counter")
-      sender ! Disruptor.Processed(index, id, data)
+      sender ! Processed(index, id, data)
 
     case msg =>
       log.debug(s"In JournalActor - received message: $msg")
-  }
-
-  def sendNext(count: Long) = {
-    log.debug("sendNext")
-
-    iterator foreach { iter =>
-      log.debug(s"isNext: ${iter.hasNext}")
-      var i = 0
-      while (iter.hasNext && i < count) {
-        i += 1
-        val (key, value) = iter.read
-        log.debug(s"Replay: $key")
-        value match {
-          case array: Vector[AnyRef @unchecked] =>
-            log.debug(key+" = "+ (array mkString ", "))
-            array foreach { msg =>
-              counter += 1
-              if (counter != key) log.info(s"Key 3 is invalid. $key vs $counter")
-              disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), self)
-            }
-          case msg: AnyRef =>
-            log.debug(key+" = "+value)
-            counter += 1
-            if (counter != key) log.info(s"Key 4 is invalid. $key vs $counter")
-            disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), self)
-        }
-      }
-      if (!iter.hasNext) {
-        log.info(s"Close Replay: $counter")
-
-        // Make sure you close the iterator to avoid resource leaks.
-        iter.close
-        iterator = None
-        disruptor.tell(ReplayFinished, self)
-//        processor ! ReplayFinished
-      }
-    }
-  }
-
-  def replay(count: Long) = {
-    log.debug("Start replay")
-
-    val iter = db.iterator
-    iterator = Some(iter)
-    sendNext(count)
   }
 }
 
@@ -135,7 +95,7 @@ object JournalActor {
   val props = Props[JournalActor]
 
   case object Initialize
-  case object ReplayFinished extends Disruptor.Command
+  case object ReplayFinished extends Command
   case class Replayed(msg: AnyRef)
   case class Replay(processor: ActorRef, disruptor: ActorRef, count: Long)
   case class ReplayNext(processor: ActorRef, disruptor: ActorRef)
