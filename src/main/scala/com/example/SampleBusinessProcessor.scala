@@ -4,7 +4,9 @@ import akka.actor.{Actor, ActorRef, ActorLogging, Props, ReceiveTimeout}
 import akka.util.Timeout
 import scala.concurrent.duration._
 
-class SampleBusinessProcessor extends BusinessProcessor with ActorLogging {
+class SampleBusinessProcessor(bufSize: Int)
+  extends BusinessProcessor(bufSize) with ActorLogging
+{
   import Disruptor._
   import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -32,5 +34,5 @@ class SampleBusinessProcessor extends BusinessProcessor with ActorLogging {
 }
 
 object SampleBusinessProcessor {
-  val props = Props(new SampleBusinessProcessor)
+  val props = Props(new SampleBusinessProcessor(100))
 }

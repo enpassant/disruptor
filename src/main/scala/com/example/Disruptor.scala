@@ -60,11 +60,30 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
       sender ! Busy(id)
   }
 
+  def writeBackToBuffer(index: Long, data: AnyRef) = {
+    data match {
+      case seq: Seq[AnyRef @unchecked] =>
+        val len = seq.length - 1
+        seq.zipWithIndex.foreach {
+          case (d, idx) =>
+            buffer(((index - len + idx) % bufSize).toInt) =
+              buffer(((index - len + idx) % bufSize).toInt).copy(data = d)
+            //log.info(s"WriteBack Seq: ${index - len + idx}, $d")
+        }
+      case _ =>
+        buffer((index % bufSize).toInt) =
+          buffer((index % bufSize).toInt).copy(data = data)
+        //log.info(s"WriteBack Data: $index, $data")
+    }
+  }
+
   def shutdown(consumers: Vector[List[Consumer]], terminateItem: Option[BufferItem]): Receive = {
     case Processed(index, id, data) =>
       log.debug(s"Received processed message: Processed($index, $id), ${indexes.mkString}")
       consumers.flatten.find { c => c.processingIndex == index && c.actorPath == id } foreach {
         c =>
+          //log.info(s"BufferItem: ${buffer((index % bufSize).toInt)}")
+          writeBackToBuffer(index, data)
           c.index = c.processingIndex + 1
           c.processingIndex = -1L
           val i = consumers.indexWhere(_.contains(c))

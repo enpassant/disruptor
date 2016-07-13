@@ -6,7 +6,9 @@ import akka.util.Timeout
 import scala.concurrent.duration._
 import scala.concurrent._
 
-abstract class BusinessProcessor extends Actor with ActorLogging {
+abstract class BusinessProcessor(bufSize: Int)
+  extends Actor with ActorLogging
+{
   import JournalActor._
   import BusinessProcessor._
   import Disruptor._
@@ -48,7 +50,7 @@ abstract class BusinessProcessor extends Actor with ActorLogging {
   def replay: Receive = {
     case Initialized =>
       log.info(s"BusinessProcessor - Start replaying")
-      journalActor ! Replay(self, disruptor, BufSize - 10)
+      journalActor ! Replay(self, disruptor, bufSize - 10)
 
     case SubscribePublisher =>
       publishers = publishers ++ List(sender)
