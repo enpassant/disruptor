@@ -21,8 +21,10 @@ abstract class BusinessProcessor(bufSize: Int)
   var publishers = List.empty[ActorRef]
   var replaying = true
 
+  def journaler: Journaler
+
   val disruptor = context.actorOf(Disruptor.props(BufSize), "disruptor")
-  val journalActor = context.actorOf(JournalActor.props, "journalActor")
+  val journalActor = context.actorOf(JournalActor.props(journaler), "journalActor")
   val pingActor2 = context.actorOf(PingActor.props, "pingActor2")
   val pingActor3 = context.actorOf(PingActor.props, "pingActor3")
 

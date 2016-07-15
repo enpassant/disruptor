@@ -1,22 +1,18 @@
 package com.example
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import org.iq80.leveldb._
-import org.fusesource.leveldbjni.JniDBFactory._
 import java.io._
 import akka.serialization._
 import java.nio.ByteBuffer
 
 import Disruptor._
 
-class JournalActor extends Actor with ActorLogging {
+class JournalActor(journaler: Journaler) extends Actor with ActorLogging {
   import JournalActor._
 
   val random = new scala.util.Random
   var counter = 0L
 
-  //val journaler = new LevelDBJournaler
-  val journaler = new FileJournaler("/tmp/example.bin")
   val serialization = SerializationExtension(context.system)
   val db = journaler.init(serialization)
   val actor = db.actor(context)
@@ -92,7 +88,7 @@ class JournalActor extends Actor with ActorLogging {
 }
 
 object JournalActor {
-  val props = Props[JournalActor]
+  def props(journaler: Journaler) = Props(new JournalActor(journaler))
 
   case object Initialize
   case object ReplayFinished extends Command

@@ -1,8 +1,6 @@
 package com.example
 
 import akka.actor.{Actor, ActorContext, ActorLogging, ActorRef, Props}
-import org.iq80.leveldb._
-import org.fusesource.leveldbjni.JniDBFactory._
 import java.io._
 import akka.serialization._
 import java.nio.ByteBuffer

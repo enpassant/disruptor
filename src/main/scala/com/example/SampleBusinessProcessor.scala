@@ -12,6 +12,8 @@ class SampleBusinessProcessor(bufSize: Int)
 
   var msgCount = 0
 
+  def journaler = new FileJournaler("/tmp/example.bin")
+
   def receiveCommand: Receive = {
     case msg: AnyRef =>
       //log.debug(s"In SampleBusinessProcessor - received message: $msg")
