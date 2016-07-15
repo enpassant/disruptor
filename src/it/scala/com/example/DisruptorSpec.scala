@@ -40,23 +40,23 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
 
       disruptor ! Initialized
       val data = "Test"
-      disruptor ! Event("0", data)
+      disruptor ! PersistentEvent("0", data)
 
-      probe1.expectMsg(100.millis, Process(0, path1, data))
-      probe2.expectMsg(100.millis, Process(0, path2, data))
-      disruptor ! Processed(0, path1)
-      disruptor ! Event("1", data)
-      probe1.expectMsg(100.millis, Process(1, path1, data))
-      disruptor ! Processed(0, path2)
-      probe2.expectMsg(100.millis, Process(1, path2, data))
-      probe3.expectMsg(100.millis, Process(0, path3, data))
-      disruptor ! Processed(0, path3)
-      expectMsg(100.millis, Processed(0, "0"))
-      disruptor ! Processed(1, path1)
-      disruptor ! Processed(1, path2)
-      probe3.expectMsg(100.millis, Process(1, path3, data))
-      disruptor ! Processed(1, path3)
-      expectMsg(100.millis, Processed(1, "1"))
+      probe1.expectMsg(100.millis, Process(1, 0, path1, data))
+      probe2.expectMsg(100.millis, Process(1, 0, path2, data))
+      disruptor ! Processed(0, path1, data)
+      disruptor ! PersistentEvent("1", data)
+      probe1.expectMsg(100.millis, Process(2, 1, path1, data))
+      disruptor ! Processed(0, path2, data)
+      probe2.expectMsg(100.millis, Process(2, 1, path2, data))
+      probe3.expectMsg(100.millis, Process(1, 0, path3, data))
+      disruptor ! Processed(0, path3, data)
+      expectMsg(100.millis, Processed(0, "0", data))
+      disruptor ! Processed(1, path1, data)
+      disruptor ! Processed(1, path2, data)
+      probe3.expectMsg(100.millis, Process(2, 1, path3, data))
+      disruptor ! Processed(1, path3, data)
+      expectMsg(100.millis, Processed(1, "1", data))
     }
   }
 }
