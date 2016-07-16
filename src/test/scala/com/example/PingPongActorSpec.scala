@@ -21,7 +21,7 @@ class PingPongActorSpec(_system: ActorSystem) extends TestKit(_system) with Impl
     "send back a Processed on a Process" in {
       val pingActor = system.actorOf(PingActor.props)
       pingActor ! Disruptor.Process(1, 0, "1", BusinessProcessor.PongMessage("pong"))
-      expectMsg(Disruptor.Processed(0, "1", BusinessProcessor.PongMessage("pong")))
+      expectMsg(Disruptor.Processed(0, "1", None))
     }
   }
 
