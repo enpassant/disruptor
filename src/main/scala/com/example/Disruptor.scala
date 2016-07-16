@@ -65,16 +65,17 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
       case seq: Seq[AnyRef @unchecked] =>
         val len = seq.length - 1
         seq.zipWithIndex.foreach {
+          case (None, idx) =>
           case (d, idx) =>
             buffer(((index - len + idx) % bufSize).toInt) =
               buffer(((index - len + idx) % bufSize).toInt).copy(data = d)
-            log.info("WriteBack Seq: {}, {}", index - len + idx, d)
+            log.debug("WriteBack Seq: {}, {}", index - len + idx, d)
         }
       case None =>
       case _ =>
         buffer((index % bufSize).toInt) =
           buffer((index % bufSize).toInt).copy(data = data)
-        log.info("WriteBack Data: {}, {}", index, data)
+        log.debug("WriteBack Data: {}, {}", index, data)
     }
   }
 

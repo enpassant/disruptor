@@ -19,7 +19,7 @@ class SampleBusinessProcessor(bufSize: Int)
   var state = 0
 
   val updateState: (AnyRef, Boolean) => AnyRef = (msg: AnyRef, replayed: Boolean) => {
-    log.info("SampleBusinessProcessor - updateState: {}, {}, {}",
+    log.debug("SampleBusinessProcessor - updateState: {}, {}, {}",
       state, msg, replayed)
     state = state + 1
     s"Result: $state"

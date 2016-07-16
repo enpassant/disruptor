@@ -48,6 +48,7 @@ abstract class BusinessProcessor(bufSize: Int)
   def receiveRecover: PartialFunction[AnyRef, AnyRef] = {
     case JournalActor.Replayed(msg: AnyRef) =>
       updateState(msg, true)
+      None
 
     case msg: AnyRef =>
       updateState(msg, false)
@@ -68,7 +69,7 @@ abstract class BusinessProcessor(bufSize: Int)
       publishers = publishers ++ List(sender)
 
     case processValue @ Disruptor.Process(0, index, id, command) =>
-      log.info("BusinessProcessor - Process: {}", processValue)
+      log.debug("BusinessProcessor - Process: {}", processValue)
       command match {
         case ReplayFinished =>
           log.info("BusinessProcessor - Start publishing")
@@ -84,9 +85,7 @@ abstract class BusinessProcessor(bufSize: Int)
         case seq: Seq[AnyRef @unchecked] => (seq map receiveRecover).toSeq
         case _: AnyRef => receiveRecover(data)
       }
-      // FIXME: Exchange Replayed cause to stop replaying
-      //sender ! Disruptor.Processed(index, id, result)
-      sender ! Disruptor.Processed(index, id, None)
+      sender ! Disruptor.Processed(index, id, result)
 
     case Disruptor.Processed(index, "Terminate", Terminate) =>
       log.info("BusinessProcessor - TERMINATED. Processed: {}, {}", index, counter)
