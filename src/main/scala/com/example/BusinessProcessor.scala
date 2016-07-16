@@ -17,7 +17,7 @@ abstract class BusinessProcessor(bufSize: Int)
   import scala.concurrent.ExecutionContext.Implicits.global
 
   val random = new scala.util.Random
-  var counter = 0
+  var counter = 0L
   var publishers = List.empty[ActorRef]
   var replaying = true
 
@@ -25,15 +25,13 @@ abstract class BusinessProcessor(bufSize: Int)
 
   val disruptor = context.actorOf(Disruptor.props(bufSize), "disruptor")
   val journalActor = context.actorOf(JournalActor.props(journaler), "journalActor")
-  val pingActor2 = context.actorOf(PingActor.props, "pingActor2")
-  val pingActor3 = context.actorOf(PingActor.props, "pingActor3")
 
-  disruptor ! Consumer(2, pingActor3.path.toString, 100)
   disruptor ! Consumer(1, journalActor.path.toString, 100)
-  disruptor ! Consumer(1, pingActor2.path.toString, 100)
   disruptor ! Consumer(3, self.path.toString, 100)
 
-  disruptor ! Initialized
+  override def preStart() {
+    disruptor ! Initialized
+  }
 
   def persist[T](msg: AnyRef): Future[Any] = {
     disruptor ? PersistentEvent(msg.toString, msg)
@@ -57,7 +55,8 @@ abstract class BusinessProcessor(bufSize: Int)
     case SubscribePublisher =>
       publishers = publishers ++ List(sender)
 
-    case Disruptor.Process(0, index, id, command) =>
+    case processValue @ Disruptor.Process(0, index, id, command) =>
+      log.info("BusinessProcessor - Process: {}", processValue)
       command match {
         case ReplayFinished =>
           log.info("BusinessProcessor - Start publishing")
@@ -73,15 +72,16 @@ abstract class BusinessProcessor(bufSize: Int)
         case Array(seq @ _*) => seq foreach receiveRecover
         case _ => receiveRecover(data)
       }
-      sender ! Disruptor.Processed(index, id, data)
+      sender ! Disruptor.Processed(index, id, None)
 
     case Disruptor.Processed(index, "Terminate", Terminate) =>
-      log.info("In PongActor - TERMINATED. Processed: {}, {}", index, counter)
+      log.info("BusinessProcessor - TERMINATED. Processed: {}, {}", index, counter)
       context.system.shutdown
 
     case Disruptor.Processed(index, id, data) =>
       counter += 1
-      log.debug("In PongActor - received process message: {}, {}, {}", index, counter, data)
+      log.debug("BusinessProcessor - received process message: {}, {}, {}",
+	index, counter, data)
   }
 }
 

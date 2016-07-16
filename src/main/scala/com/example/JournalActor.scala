@@ -36,7 +36,7 @@ class JournalActor(journaler: Journaler) extends Actor with ActorLogging {
       }
       if (replayed.size > 0) {
         counter += replayed.size
-        sender ! Processed(index - remains.size, id, replayed)
+        sender ! Processed(index - remains.size, id, None)
       }
       log.debug("In JournalActor - Replayed: {}", replayed mkString ", ")
       log.debug("In JournalActor - Remains: {}", remains mkString ", ")

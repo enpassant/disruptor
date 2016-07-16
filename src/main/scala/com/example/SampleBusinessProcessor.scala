@@ -14,6 +14,12 @@ class SampleBusinessProcessor(bufSize: Int)
 
   def journaler = new FileJournaler("/tmp/example.bin")
 
+  val pingActor2 = context.actorOf(PingActor.props, "pingActor2")
+  val pingActor3 = context.actorOf(PingActor.props, "pingActor3")
+
+  disruptor ! Consumer(2, pingActor3.path.toString, 100)
+  disruptor ! Consumer(1, pingActor2.path.toString, 100)
+
   def receiveCommand: Receive = {
     case msg: AnyRef =>
       //log.debug("In SampleBusinessProcessor - received message: {}", msg)

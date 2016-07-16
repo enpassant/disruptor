@@ -4,23 +4,27 @@ import akka.actor.{Actor, ActorLogging, Props}
 
 class PingActor extends Actor with ActorLogging {
   import PingActor._
+  import Disruptor._
 
   val random = new scala.util.Random
   var counter = 0
 
   def receive = {
     case Initialize =>
-      log.debug("In PingActor - starting ping-pong")
-    case Disruptor.Process(seqNr, index, id, data: Seq[AnyRef]) =>
+      log.debug("PingActor - starting ping-pong")
+
+    case processValue @ Disruptor.Process(seqNr, index, id, data: Seq[AnyRef]) =>
+      log.debug("PingActor - Process: {}", processValue)
       counter += 1
       sender ! Disruptor.Processed(index, id, data)
 
-    case Disruptor.Process(seqNr, index, id, data) =>
+    case processValue @ Disruptor.Process(seqNr, index, id, data) =>
+      log.debug("PingActor - Process: {}", processValue)
       counter += 1
       sender ! Disruptor.Processed(index, id, data)
 
     case msg =>
-      log.debug("In PingActor - received message: {}", msg)
+      log.debug("PingActor - received message: {}", msg)
   }
 }
 
