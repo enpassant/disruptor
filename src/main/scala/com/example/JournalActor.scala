@@ -24,7 +24,7 @@ class JournalActor(journaler: Journaler) extends Actor with ActorLogging {
       actor ! ReplayNext(disruptor)
 
     case Process(0, index, id, command) =>
-      log.debug(s"In JournalActor - process command")
+      log.debug("In JournalActor - process command")
       sender ! Processed(index, id, command)
 
     case Process(seqNr, index, id, Array(others @ _*)) =>
@@ -35,15 +35,17 @@ class JournalActor(journaler: Journaler) extends Actor with ActorLogging {
         case _ => false
       }
       if (replayed.size > 0) sender ! Processed(index - remains.size, id, replayed)
-      log.debug(s"""In JournalActor - Replayed: ${replayed mkString ", "}""")
-      log.debug(s"""In JournalActor - Remains: ${remains mkString ", "}""")
+      log.debug("In JournalActor - Replayed: {}", replayed mkString ", ")
+      log.debug("In JournalActor - Remains: {}", remains mkString ", ")
       if (remains.size > 0) process(Process(seqNr, index, id, remains))
 
     case Processed(index, id, command: Command) =>
-      log.debug(s"In JournalActor - received command message: $index, $counter, $command")
+      log.debug("In JournalActor - received command message: {}, {}, {}",
+        index, counter, command)
 
     case Processed(index, id, data) =>
-      log.debug(s"In JournalActor - received process message: $index, $counter, $data")
+      log.debug("In JournalActor - received process message: {}, {}, {}",
+        index, counter, data)
       counter += 1
 
     case msg =>
@@ -52,7 +54,7 @@ class JournalActor(journaler: Journaler) extends Actor with ActorLogging {
 
   def process: PartialFunction[Any, Unit] = {
     case Replay(d, count) =>
-      log.debug("Start replay")
+      log.debug("Start replay (count: {})", count)
 
       disruptor = d
       actor ! Replay(d, count)
@@ -61,11 +63,11 @@ class JournalActor(journaler: Journaler) extends Actor with ActorLogging {
       sender ! Processed(index, id, Terminate)
 
     case Process(seqNr, index, id, Replayed(data)) =>
-      log.debug(s"""In JournalActor - Replayed: $data""")
+      log.debug("In JournalActor - Replayed: {}", data)
       sender ! Processed(index, id, Replayed(data))
 
     case Process(seqNr, index, id, data: Seq[AnyRef @unchecked]) =>
-      log.debug(s"In JournalActor - received process message: $index, $data")
+      log.debug("In JournalActor - received process message: {}, {}", index, data)
       val serializer = serialization.findSerializerFor(data)
 //      var i = index - data.size
       db.writeSeqData(seqNr, data)
@@ -73,15 +75,15 @@ class JournalActor(journaler: Journaler) extends Actor with ActorLogging {
       sender ! Processed(index, id, data)
 
     case Process(seqNr, index, id, data) =>
-      log.debug(s"In JournalActor save $seqNr")
-      log.debug(s"In JournalActor - received process message: $index, $data")
+      log.debug("In JournalActor save {}", seqNr)
+      log.debug("In JournalActor - received process message: {}, {}", index, data)
       db.writeData(seqNr, data)
       counter += 1
-      if (counter != seqNr) log.info(s"Key 2 is invalid. $index vs $counter")
+      if (counter != seqNr) log.info("Key 2 is invalid. {} vs {}", index, counter)
       sender ! Processed(index, id, data)
 
     case msg =>
-      log.debug(s"In JournalActor - received message: $msg")
+      log.debug("In JournalActor - received message: {}", msg)
   }
 }
 

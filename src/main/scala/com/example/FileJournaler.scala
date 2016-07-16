@@ -46,13 +46,13 @@ class FileJournalerDB(val serialization: Serialization, val fileName: String)
     val serializer = serialization.findSerializerFor(data)
     try {
       data foreach { d =>
-        //log.debug(s"In JournalActor save $i")
+        //log.debug("In JournalActor save {}", i)
         val binData = serializer.toBinary(d)
         val bb = java.nio.ByteBuffer.allocate(4)
         bb.putInt(binData.length)
         outputStream.write(bb.array)
         outputStream.write(binData)
-        //if (counter != i) log.info(s"Key 1 is invalid. $i vs $counter")
+        //if (counter != i) log.info("Key 1 is invalid. {} vs {}", i, counter)
         i = i + 1
       }
     } finally {
@@ -70,29 +70,29 @@ class FileJournalerActor(val serializer: Serializer, val inputStream: InputStrea
   def sendNext(count: Long, disruptor: ActorRef) = {
     log.debug("sendNext")
 
-    log.debug(s"isNext: ${iter.hasNext}")
+    log.debug("isNext: {}", iter.hasNext)
     var i = 0
     while (iter.hasNext && i < count) {
       i += 1
       val (key, value) = iter.read
-      log.debug(s"Replay: $key")
+      log.debug("Replay: {}", key)
       value match {
         case array: Vector[AnyRef @unchecked] =>
-          log.debug(key+" = "+ (array mkString ", "))
+          log.debug("{} = {}", key, (array mkString ", "))
           array foreach { msg =>
             counter += 1
-            if (counter != key) log.info(s"Key 3 is invalid. $key vs $counter")
+            if (counter != key) log.info("Key 3 is invalid. {} vs {}", key, counter)
             disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), context.parent)
           }
         case msg: AnyRef =>
-          log.debug(key+" = "+value)
+          log.debug("{} = {}", key, value)
           counter += 1
-          if (counter != key) log.info(s"Key 4 is invalid. $key vs $counter")
+          if (counter != key) log.info("Key 4 is invalid. {} vs {}", key, counter)
           disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), context.parent)
       }
     }
     if (!iter.hasNext) {
-      log.info(s"Close Replay: $counter")
+      log.info("Close Replay: {}", counter)
 
       disruptor.tell(ReplayFinished, context.parent)
       context.become(finished)

@@ -23,7 +23,7 @@ abstract class BusinessProcessor(bufSize: Int)
 
   def journaler: Journaler
 
-  val disruptor = context.actorOf(Disruptor.props(BufSize), "disruptor")
+  val disruptor = context.actorOf(Disruptor.props(bufSize), "disruptor")
   val journalActor = context.actorOf(JournalActor.props(journaler), "journalActor")
   val pingActor2 = context.actorOf(PingActor.props, "pingActor2")
   val pingActor3 = context.actorOf(PingActor.props, "pingActor3")
@@ -51,7 +51,7 @@ abstract class BusinessProcessor(bufSize: Int)
 
   def replay: Receive = {
     case Initialized =>
-      log.info(s"BusinessProcessor - Start replaying")
+      log.info("BusinessProcessor - Start replaying")
       journalActor ! Replay(disruptor, bufSize - 10)
 
     case SubscribePublisher =>
@@ -60,7 +60,7 @@ abstract class BusinessProcessor(bufSize: Int)
     case Disruptor.Process(0, index, id, command) =>
       command match {
         case ReplayFinished =>
-          log.info(s"BusinessProcessor - Start publishing")
+          log.info("BusinessProcessor - Start publishing")
           publishers foreach { _ ! disruptor }
           sender ! Disruptor.Processed(index, id, command)
           context.become(process orElse receiveCommand)
@@ -76,19 +76,16 @@ abstract class BusinessProcessor(bufSize: Int)
       sender ! Disruptor.Processed(index, id, data)
 
     case Disruptor.Processed(index, "Terminate", Terminate) =>
-      log.info(s"In PongActor - TERMINATED. Processed: $index, $counter")
+      log.info("In PongActor - TERMINATED. Processed: {}, {}", index, counter)
       context.system.shutdown
 
     case Disruptor.Processed(index, id, data) =>
       counter += 1
-      log.debug(s"In PongActor - received process message: $index, $counter, $data")
+      log.debug("In PongActor - received process message: {}, {}, {}", index, counter, data)
   }
 }
 
 object BusinessProcessor {
-  val BufSize = 1024 * 1024
-//  val props = Props[BusinessProcessor]
-
   case object SubscribePublisher
   case class PongMessage(text: String)
 }

@@ -20,7 +20,7 @@ class PingActor extends Actor with ActorLogging {
       sender ! Disruptor.Processed(index, id, data)
 
     case msg =>
-      log.debug(s"In PingActor - received message: $msg")
+      log.debug("In PingActor - received message: {}", msg)
   }
 }
 

@@ -18,7 +18,7 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
     case Initialized =>
       val orders = consumers.map(_.order).toSet
       indexes = new Array[Long](orders.size)
-      log.debug(indexes mkString ",")
+      log.debug("{}", indexes mkString ",")
       val cs = consumers.tail.foldLeft(Vector(List(consumers.head))) {
         (a, c) => if (a.last.head.order != c.order) {
             a :+ List(c)
@@ -27,7 +27,7 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
             a.updated(a.size - 1, c :: a.last)
           }
       }
-      log.debug(cs mkString ",")
+      log.debug("{}", cs mkString ",")
       context.become(process(cs))
 
     case GetState if testMode =>
@@ -39,10 +39,10 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
 
   def events(consumers: Vector[List[Consumer]]): Receive = {
     case data: Command =>
-      log.debug(s"Received command message: $data")
+      log.debug("Received command message: {}", data)
       buffer((indexes.head % bufSize).toInt) = BufferItem(0, sender, data.toString, data)
       indexes(0) = indexes.head + 1
-      log.debug(data.toString)
+      log.debug("{}", data.toString)
       step(1, consumers)
 
     case PersistentEvent(id, Terminate) =>
@@ -52,11 +52,11 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
       seqNr += 1
       buffer((indexes.head % bufSize).toInt) = BufferItem(seqNr, sender, id, data)
       indexes(0) = indexes.head + 1
-      log.debug(data.toString)
+      log.debug("{}", data.toString)
       step(1, consumers)
 
     case PersistentEvent(id, data) =>
-      log.debug(s"The event buffer is full! The $data is dropped.")
+      log.debug("The event buffer is full! The {} is dropped.", data)
       sender ! Busy(id)
   }
 
@@ -68,21 +68,23 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
           case (d, idx) =>
             buffer(((index - len + idx) % bufSize).toInt) =
               buffer(((index - len + idx) % bufSize).toInt).copy(data = d)
-            //log.info(s"WriteBack Seq: ${index - len + idx}, $d")
+            //log.info("WriteBack Seq: {}, {}", index - len + idx, d)
         }
+      case None =>
       case _ =>
         buffer((index % bufSize).toInt) =
           buffer((index % bufSize).toInt).copy(data = data)
-        //log.info(s"WriteBack Data: $index, $data")
+        //log.info("WriteBack Data: {}, {}", index, data)
     }
   }
 
   def shutdown(consumers: Vector[List[Consumer]], terminateItem: Option[BufferItem]): Receive = {
     case Processed(index, id, data) =>
-      log.debug(s"Received processed message: Processed($index, $id), ${indexes.mkString}")
+      log.debug("Received processed message: Processed({}, {}), {}",
+        index, id, indexes.mkString)
       consumers.flatten.find { c => c.processingIndex == index && c.actorPath == id } foreach {
         c =>
-          //log.info(s"BufferItem: ${buffer((index % bufSize).toInt)}")
+          //log.info("BufferItem: {}", buffer((index % bufSize).toInt)")
           writeBackToBuffer(index, data)
           c.index = c.processingIndex + 1
           c.processingIndex = -1L
@@ -98,7 +100,7 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
             range.foreach { idx =>
               val bufferItem = buffer((idx % bufSize).toInt)
               val processed = Processed(idx, bufferItem.id, bufferItem.data)
-              log.debug(s"Full processed: $processed")
+              log.debug("Full processed: {}", processed)
               bufferItem.sender ! processed
             }
 
@@ -133,7 +135,7 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
           }
           consumer.processingIndex = cIndex + count - 1
           val process = Process(firstSeqNr, consumer.processingIndex, consumer.actorPath, data)
-          log.debug(s"$process")
+          log.debug("{}", process)
           context.actorSelection(consumer.actorPath) ! process
         }
     }
@@ -141,7 +143,7 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
 
   def step(index: Int, consumers: Vector[List[Consumer]]): Unit = {
     val prevIndex = indexes(index - 1)
-    log.debug(s"Step: $index, $prevIndex")
+    log.debug("Step: {}, {}", index, prevIndex)
 
     consumers(index).filter(_.processingIndex == -1L).foreach { c =>
       stepConsumer(prevIndex, c)

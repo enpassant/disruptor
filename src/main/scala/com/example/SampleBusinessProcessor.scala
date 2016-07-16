@@ -16,7 +16,7 @@ class SampleBusinessProcessor(bufSize: Int)
 
   def receiveCommand: Receive = {
     case msg: AnyRef =>
-      //log.debug(s"In SampleBusinessProcessor - received message: $msg")
+      //log.debug("In SampleBusinessProcessor - received message: {}", msg)
       disruptor ! PersistentEvent(msg.toString, msg)
       //val sndr = sender
       //persist(msg) map {
@@ -28,7 +28,7 @@ class SampleBusinessProcessor(bufSize: Int)
 
   def receiveRecover: Receive = {
     case JournalActor.Replayed(msg: AnyRef) =>
-      //log.info(s"AuditoriumBusinessProcessor - receiveRecover replayed: $msg")
+      //log.info("AuditoriumBusinessProcessor - receiveRecover replayed: {}", msg)
 
     case msg =>
       msgCount += 1
@@ -36,5 +36,5 @@ class SampleBusinessProcessor(bufSize: Int)
 }
 
 object SampleBusinessProcessor {
-  val props = Props(new SampleBusinessProcessor(100))
+  val props = Props(new SampleBusinessProcessor(15))
 }

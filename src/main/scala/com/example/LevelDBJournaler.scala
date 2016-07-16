@@ -42,11 +42,11 @@ class LevelDBJournalerDB(val serialization: Serialization, val db: DB)
     val serializer = serialization.findSerializerFor(data)
     try {
       data foreach { d =>
-        //log.debug(s"In JournalActor save $i")
+        //log.debug("In JournalActor save {}", i)
         val bb = java.nio.ByteBuffer.allocate(8)
         bb.putLong(i)
         batch.put(bb.array, serializer.toBinary(d))
-        //if (counter != i) log.info(s"Key 1 is invalid. $i vs $counter")
+        //if (counter != i) log.info("Key 1 is invalid. {} vs {}", i, counter)
         i = i + 1
       }
       db.write(batch)

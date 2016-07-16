@@ -9,9 +9,9 @@ class SampleClient(businessProcessor: ActorRef) extends Actor with ActorLogging 
   val random = new scala.util.Random
   var counter = 0
 
-  log.info(s"In SampleClient - send events")
+  log.info("In SampleClient - send events")
 
-  for (i <- 0 until 5) {
+  for (i <- 0 until 20) {
     businessProcessor ! PingMessage(i.toString)
   }
   businessProcessor ! Terminate
@@ -21,11 +21,11 @@ class SampleClient(businessProcessor: ActorRef) extends Actor with ActorLogging 
       log.info("In SampleClient - starting ping-pong")
 
     case Disruptor.Processed(index, "Terminate", Terminate) =>
-      log.info(s"In SampleClient - TERMINATED. Processed: $index, $counter")
+      log.info("In SampleClient - TERMINATED. Processed: {}, {}", index, counter)
       context.system.shutdown
 
     case msg =>
-      log.info(s"In SampleClient - received message: $msg")
+      log.info("In SampleClient - received message: {}", msg)
   }
 }
 
