@@ -16,12 +16,12 @@ class PingActor extends Actor with ActorLogging {
     case processValue @ Disruptor.Process(seqNr, index, id, data: Seq[AnyRef]) =>
       log.debug("PingActor - Process: {}", processValue)
       counter += 1
-      sender ! Disruptor.Processed(index, id, data)
+      sender ! Disruptor.Processed(index, id, None)
 
     case processValue @ Disruptor.Process(seqNr, index, id, data) =>
       log.debug("PingActor - Process: {}", processValue)
       counter += 1
-      sender ! Disruptor.Processed(index, id, data)
+      sender ! Disruptor.Processed(index, id, None)
 
     case msg =>
       log.debug("PingActor - received message: {}", msg)

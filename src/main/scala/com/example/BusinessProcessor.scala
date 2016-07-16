@@ -21,13 +21,19 @@ abstract class BusinessProcessor(bufSize: Int)
   var publishers = List.empty[ActorRef]
   var replaying = true
 
+  type STATE
+
+  var state: STATE
+
+  def updateState: (AnyRef, Boolean) => AnyRef
+
   def journaler: Journaler
 
   val disruptor = context.actorOf(Disruptor.props(bufSize), "disruptor")
   val journalActor = context.actorOf(JournalActor.props(journaler), "journalActor")
 
   disruptor ! Consumer(1, journalActor.path.toString, 100)
-  disruptor ! Consumer(3, self.path.toString, 100)
+  disruptor ! Consumer(100, self.path.toString, 100)
 
   override def preStart() {
     disruptor ! Initialized
@@ -39,7 +45,13 @@ abstract class BusinessProcessor(bufSize: Int)
 
   def receiveCommand: Receive
 
-  def receiveRecover: Receive
+  def receiveRecover: PartialFunction[AnyRef, AnyRef] = {
+    case JournalActor.Replayed(msg: AnyRef) =>
+      updateState(msg, true)
+
+    case msg: AnyRef =>
+      updateState(msg, false)
+  }
 
 //  def persist(event: AnyRef)(handler: AnyRef => Unit): Unit = {
 //    disruptor ! PersistentEvent(counter.toString, event)
@@ -68,10 +80,12 @@ abstract class BusinessProcessor(bufSize: Int)
 
   def process: Receive = {
     case Disruptor.Process(seqNr, index, id, data) =>
-      data match {
-        case Array(seq @ _*) => seq foreach receiveRecover
-        case _ => receiveRecover(data)
+      val result: AnyRef = data match {
+        case seq: Seq[AnyRef @unchecked] => (seq map receiveRecover).toSeq
+        case _: AnyRef => receiveRecover(data)
       }
+      // FIXME: Exchange Replayed cause to stop replaying
+      //sender ! Disruptor.Processed(index, id, result)
       sender ! Disruptor.Processed(index, id, None)
 
     case Disruptor.Processed(index, "Terminate", Terminate) =>

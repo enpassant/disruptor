@@ -68,13 +68,13 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
           case (d, idx) =>
             buffer(((index - len + idx) % bufSize).toInt) =
               buffer(((index - len + idx) % bufSize).toInt).copy(data = d)
-            //log.info("WriteBack Seq: {}, {}", index - len + idx, d)
+            log.info("WriteBack Seq: {}, {}", index - len + idx, d)
         }
       case None =>
       case _ =>
         buffer((index % bufSize).toInt) =
           buffer((index % bufSize).toInt).copy(data = data)
-        //log.info("WriteBack Data: {}, {}", index, data)
+        log.info("WriteBack Data: {}, {}", index, data)
     }
   }
 
@@ -84,7 +84,7 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
         index, id, indexes.mkString)
       consumers.flatten.find { c => c.processingIndex == index && c.actorPath == id } foreach {
         c =>
-          //log.info("BufferItem: {}", buffer((index % bufSize).toInt)")
+          //log.info("BufferItem: {}", buffer((index % bufSize).toInt))
           writeBackToBuffer(index, data)
           c.index = c.processingIndex + 1
           c.processingIndex = -1L
@@ -129,7 +129,7 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
             case _ => (maxIdx - firstIdx) match {
               case 1 => (buffer(firstIdx).data, 1)
               case _ =>
-                val seq = buffer.slice(firstIdx, maxIdx).takeWhile(_.seqNr > 0).map(_.data)
+                val seq = buffer.slice(firstIdx, maxIdx).takeWhile(_.seqNr > 0).map(_.data).toSeq
                 (seq, seq.size)
             }
           }

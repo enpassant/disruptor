@@ -14,6 +14,17 @@ class SampleBusinessProcessor(bufSize: Int)
 
   def journaler = new FileJournaler("/tmp/example.bin")
 
+  type STATE = Int
+
+  var state = 0
+
+  val updateState: (AnyRef, Boolean) => AnyRef = (msg: AnyRef, replayed: Boolean) => {
+    log.info("SampleBusinessProcessor - updateState: {}, {}, {}",
+      state, msg, replayed)
+    state = state + 1
+    s"Result: $state"
+  }
+
   val pingActor2 = context.actorOf(PingActor.props, "pingActor2")
   val pingActor3 = context.actorOf(PingActor.props, "pingActor3")
 
@@ -22,7 +33,7 @@ class SampleBusinessProcessor(bufSize: Int)
 
   def receiveCommand: Receive = {
     case msg: AnyRef =>
-      //log.debug("In SampleBusinessProcessor - received message: {}", msg)
+      //log.debug("SampleBusinessProcessor - received message: {}", msg)
       disruptor ! PersistentEvent(msg.toString, msg)
       //val sndr = sender
       //persist(msg) map {
@@ -30,14 +41,6 @@ class SampleBusinessProcessor(bufSize: Int)
           //sndr ! msg
           //msgCount += 1
       //}
-  }
-
-  def receiveRecover: Receive = {
-    case JournalActor.Replayed(msg: AnyRef) =>
-      //log.info("AuditoriumBusinessProcessor - receiveRecover replayed: {}", msg)
-
-    case msg =>
-      msgCount += 1
   }
 }
 
