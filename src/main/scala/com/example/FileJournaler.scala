@@ -100,10 +100,10 @@ class FileJournalerActor(val serializer: Serializer, val inputStream: InputStrea
   }
 
   def receive = {
-    case Replay(processor, disruptor, count) =>
+    case Replay(disruptor, count) =>
       sendNext(count, disruptor)
 
-    case ReplayNext(processor, disruptor) =>
+    case ReplayNext(disruptor) =>
       sendNext(1, disruptor)
   }
 

@@ -18,11 +18,10 @@ class JournalActor(journaler: Journaler) extends Actor with ActorLogging {
   val actor = db.actor(context)
 
   var disruptor: ActorRef = _
-  var processor: ActorRef = _
 
   def receive: PartialFunction[Any, Unit] = {
-    case ReplayNext(processor, disruptor) =>
-      actor ! ReplayNext(processor, disruptor)
+    case ReplayNext(disruptor) =>
+      actor ! ReplayNext(disruptor)
 
     case Process(0, index, id, command) =>
       log.debug(s"In JournalActor - process command")
@@ -52,12 +51,11 @@ class JournalActor(journaler: Journaler) extends Actor with ActorLogging {
   }
 
   def process: PartialFunction[Any, Unit] = {
-    case Replay(p, d, count) =>
+    case Replay(d, count) =>
       log.debug("Start replay")
 
-      processor = p
       disruptor = d
-      actor ! Replay(p, d, count)
+      actor ! Replay(d, count)
 
     case Process(seqNr, index, id, Terminate) =>
       sender ! Processed(index, id, Terminate)
@@ -93,8 +91,8 @@ object JournalActor {
   case object Initialize
   case object ReplayFinished extends Command
   case class Replayed(msg: AnyRef)
-  case class Replay(processor: ActorRef, disruptor: ActorRef, count: Long)
-  case class ReplayNext(processor: ActorRef, disruptor: ActorRef)
+  case class Replay(disruptor: ActorRef, count: Long)
+  case class ReplayNext(disruptor: ActorRef)
   case class PingMessage(text: String)
 }
 

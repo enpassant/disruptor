@@ -52,7 +52,7 @@ abstract class BusinessProcessor(bufSize: Int)
   def replay: Receive = {
     case Initialized =>
       log.info(s"BusinessProcessor - Start replaying")
-      journalActor ! Replay(self, disruptor, bufSize - 10)
+      journalActor ! Replay(disruptor, bufSize - 10)
 
     case SubscribePublisher =>
       publishers = publishers ++ List(sender)
