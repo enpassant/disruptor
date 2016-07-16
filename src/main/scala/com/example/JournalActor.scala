@@ -39,6 +39,9 @@ class JournalActor(journaler: Journaler) extends Actor with ActorLogging {
       log.debug("In JournalActor - Remains: {}", remains mkString ", ")
       if (remains.size > 0) process(Process(seqNr, index, id, remains))
 
+    case Processed(index, id, Replayed(data)) =>
+      actor ! ReplayNext(disruptor)
+
     case Processed(index, id, command: Command) =>
       log.debug("In JournalActor - received command message: {}, {}, {}",
         index, counter, command)
