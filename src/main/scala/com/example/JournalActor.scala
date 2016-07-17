@@ -27,7 +27,7 @@ class JournalActor(journaler: Journaler) extends Actor with ActorLogging {
       log.debug("In JournalActor - process command")
       sender ! Processed(index, id, None)
 
-    case Process(seqNr, index, id, Array(others @ _*)) =>
+    case Process(seqNr, index, id, others: Seq[AnyRef @unchecked]) =>
       val (replayed, remains) = others.filter {
         _ != Terminate
       } partition {
@@ -54,6 +54,7 @@ class JournalActor(journaler: Journaler) extends Actor with ActorLogging {
         index, counter, data)
 
     case msg =>
+      log.debug("In JournalActor - process: {}", msg)
       process(msg)
   }
 
@@ -102,6 +103,5 @@ object JournalActor {
   case class Replayed(msg: AnyRef)
   case class Replay(disruptor: ActorRef, count: Long)
   case class ReplayNext(disruptor: ActorRef)
-  case class PingMessage(text: String)
 }
 

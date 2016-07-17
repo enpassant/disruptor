@@ -5,16 +5,22 @@ import java.io._
 import akka.serialization._
 import java.nio.ByteBuffer
 
+import org.json4s.Formats
+import org.json4s.jackson.Serialization.{ read => jsread, write }
+
 import Disruptor._
 import JournalActor._
 
-class FileJournaler(val fileName: String) extends Journaler {
+class FileJournaler(val fileName: String, val formats: Formats) extends Journaler {
   def init(serialization: Serialization) = {
-    new FileJournalerDB(serialization, fileName)
+    new FileJournalerDB(serialization, fileName, formats)
   }
 }
 
-class FileJournalerDB(val serialization: Serialization, val fileName: String)
+class FileJournalerDB(
+  val serialization: Serialization,
+  val fileName: String,
+  implicit val formats: Formats)
   extends JournalerDB {
 
   val outputStream = new BufferedOutputStream(new FileOutputStream(fileName, true))
@@ -22,18 +28,19 @@ class FileJournalerDB(val serialization: Serialization, val fileName: String)
   def actor(context: ActorContext) = {
     val inputStream = new BufferedInputStream(new FileInputStream(fileName))
     val serializer = serialization.findSerializerFor("data")
-    context.actorOf(FileJournaler.props(serializer, inputStream))
+    context.actorOf(FileJournaler.props(serializer, inputStream, formats))
   }
 
   def iterator = {
     val inputStream = new BufferedInputStream(new FileInputStream(fileName))
     val serializer = serialization.findSerializerFor("data")
-    new FileJournalerDBIterator(serializer, inputStream)
+    new FileJournalerDBIterator(serializer, inputStream, formats)
   }
 
   def writeData(seqNr: Long, data: AnyRef): Unit = {
     val serializer = serialization.findSerializerFor(data)
-    val binData = serializer.toBinary(data)
+    //val binData = serializer.toBinary(data)
+    val binData = write(data).getBytes
     val bb = java.nio.ByteBuffer.allocate(4)
     bb.putInt(binData.length)
     outputStream.write(bb.array)
@@ -46,8 +53,8 @@ class FileJournalerDB(val serialization: Serialization, val fileName: String)
     val serializer = serialization.findSerializerFor(data)
     try {
       data foreach { d =>
-        //log.debug("In JournalActor save {}", i)
-        val binData = serializer.toBinary(d)
+        //val binData = serializer.toBinary(d)
+        val binData = write(d).getBytes
         val bb = java.nio.ByteBuffer.allocate(4)
         bb.putInt(binData.length)
         outputStream.write(bb.array)
@@ -61,10 +68,13 @@ class FileJournalerDB(val serialization: Serialization, val fileName: String)
   }
 }
 
-class FileJournalerActor(val serializer: Serializer, val inputStream: InputStream)
+class FileJournalerActor(
+  val serializer: Serializer,
+  val inputStream: InputStream,
+  implicit val formats: Formats)
   extends Actor with ActorLogging {
 
-  var iter = new FileJournalerDBIterator(serializer, inputStream)
+  var iter = new FileJournalerDBIterator(serializer, inputStream, formats)
   var counter = 0
 
   def sendNext(count: Long, disruptor: ActorRef) = {
@@ -113,7 +123,11 @@ class FileJournalerActor(val serializer: Serializer, val inputStream: InputStrea
   }
 }
 
-class FileJournalerDBIterator(val serializer: Serializer, val inputStream: InputStream) {
+class FileJournalerDBIterator(
+  val serializer: Serializer,
+  val inputStream: InputStream,
+  implicit val formats: Formats)
+{
   var index = 0L
 
   def hasNext = inputStream.available > 0
@@ -125,7 +139,8 @@ class FileJournalerDBIterator(val serializer: Serializer, val inputStream: Input
     val length = bb.getInt
     val buf = new Array[Byte](length)
     inputStream.read(buf)
-    val value = serializer.fromBinary(buf)
+    //val value = serializer.fromBinary(buf)
+    val value: AnyRef = jsread(new String(buf))
     index += 1
     (index, value)
   }
@@ -134,6 +149,6 @@ class FileJournalerDBIterator(val serializer: Serializer, val inputStream: Input
 }
 
 object FileJournaler {
-  def props(serializer: Serializer, inputStream: InputStream) =
-    Props(new FileJournalerActor(serializer, inputStream))
+  def props(serializer: Serializer, inputStream: InputStream, formats: Formats) =
+    Props(new FileJournalerActor(serializer, inputStream, formats))
 }

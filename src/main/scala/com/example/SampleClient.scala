@@ -29,8 +29,9 @@ class SampleClient(businessProcessor: ActorRef) extends Actor with ActorLogging 
   }
 }
 
+case class PingMessage(text: String)
+
 object SampleClient {
   def props(businessProcessor: ActorRef) = Props(new SampleClient(businessProcessor))
   case object Initialize
-  case class PingMessage(text: String)
 }
