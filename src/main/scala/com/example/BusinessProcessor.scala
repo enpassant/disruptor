@@ -40,10 +40,10 @@ abstract class BusinessProcessor(bufSize: Int)
     disruptor ! Initialized
   }
 
-  def persist[T](id: String, msg: AnyRef)(successFn: Receive): Unit = {
+  def persist[T](id: String, msg: AnyRef)(handler: Receive): Unit = {
     val persisted = disruptor ? PersistentEvent(id, msg)
-    persisted onSuccess successFn
-    persisted onFailure successFn
+    persisted onSuccess handler
+    persisted onFailure handler
   }
 
   def receiveCommand: Receive
@@ -56,10 +56,6 @@ abstract class BusinessProcessor(bufSize: Int)
     case msg: AnyRef =>
       updateState(msg, false)
   }
-
-//  def persist(event: AnyRef)(handler: AnyRef => Unit): Unit = {
-//    disruptor ! PersistentEvent(counter.toString, event)
-//  }
 
   def receive = replay orElse process
 
