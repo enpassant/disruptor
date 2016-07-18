@@ -22,10 +22,7 @@ class SampleBusinessProcessor(bufSize: Int)
 
   def formats: Formats = new DefaultFormats {
     override val typeHintFieldName = "_t"
-    override val typeHints = ShortTypeHints(
-      List(
-        classOf[PingMessage],
-        classOf[JournalActor.Replayed]))
+    override val typeHints = ShortTypeHints(List(classOf[PingMessage]))
   } ++ org.json4s.ext.JodaTimeSerializers.all + MyDateTimeSerializer
 
   def journaler = new FileJournaler("/tmp/example.bin", formats)
