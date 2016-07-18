@@ -2,7 +2,8 @@ package com.example
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 
-class SampleClient(businessProcessor: ActorRef) extends Actor with ActorLogging {
+class SampleClient(businessProcessor: ActorRef) extends Actor with ActorLogging
+{
   import SampleClient._
   import Disruptor._
 
@@ -21,17 +22,19 @@ class SampleClient(businessProcessor: ActorRef) extends Actor with ActorLogging 
       log.info("In SampleClient - starting ping-pong")
 
     case Disruptor.Processed(index, "Terminate", Terminate) =>
-      log.info("In SampleClient - TERMINATED. Processed: {}, {}", index, counter)
+      log.info("In SampleClient - TERMINATED. Processed: {}, {}",
+        index, counter)
       context.system.shutdown
 
     case msg =>
-      log.info("In SampleClient - received message: {}", msg)
+      //log.info("In SampleClient - received message: {}", msg)
   }
 }
 
 case class PingMessage(text: String)
 
 object SampleClient {
-  def props(businessProcessor: ActorRef) = Props(new SampleClient(businessProcessor))
+  def props(businessProcessor: ActorRef) = Props(
+    new SampleClient(businessProcessor))
   case object Initialize
 }

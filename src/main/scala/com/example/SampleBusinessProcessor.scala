@@ -31,7 +31,7 @@ class SampleBusinessProcessor(bufSize: Int)
 
   var state = 0
 
-  val updateState: (AnyRef, Boolean) => AnyRef = (msg: AnyRef, replayed: Boolean) => {
+  val updateState: (AnyRef, Boolean) => AnyRef = (msg, replayed) => {
     log.debug("SampleBusinessProcessor - updateState: {}, {}, {}",
       state, msg, replayed)
     state = state + 1
@@ -46,21 +46,24 @@ class SampleBusinessProcessor(bufSize: Int)
 
   def receiveCommand: Receive = {
     case msg: AnyRef =>
-      //log.debug("SampleBusinessProcessor - received message: {}", msg)
-      disruptor ! PersistentEvent(msg.toString, msg)
-      //val sndr = sender
-      //persist(msg) map {
-        //case msg =>
-          //sndr ! msg
-          //msgCount += 1
-      //}
+      val sndr = sender
+      persist(msg.toString, msg) {
+        case failure @ Busy(id) =>
+          log.debug("SampleBusinessProcessor - failed message: {}, {}",
+            msg, failure)
+          sndr ! msg
+        case msg =>
+          log.debug("SampleBusinessProcessor - success message: {}", msg)
+          sndr ! msg
+      }
   }
 }
 
 object SampleBusinessProcessor {
-  val props = Props(new SampleBusinessProcessor(21))
+  val props = Props(new SampleBusinessProcessor(11))
 
-  case object MyDateTimeSerializer extends CustomSerializer[DateTime](format => (
+  case object MyDateTimeSerializer extends CustomSerializer[DateTime](
+    format => (
     {
       case JString(s) => Try(new DateTime(s)).getOrElse(
         throw new MappingException(s"Invalid date format: $s"))

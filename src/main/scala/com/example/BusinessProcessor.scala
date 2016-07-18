@@ -30,7 +30,8 @@ abstract class BusinessProcessor(bufSize: Int)
   def journaler: Journaler
 
   val disruptor = context.actorOf(Disruptor.props(bufSize), "disruptor")
-  val journalActor = context.actorOf(JournalActor.props(journaler), "journalActor")
+  val journalActor = context.actorOf(JournalActor.props(journaler),
+    "journalActor")
 
   disruptor ! Consumer(1, journalActor.path.toString, 100)
   disruptor ! Consumer(100, self.path.toString, 100)
@@ -39,8 +40,10 @@ abstract class BusinessProcessor(bufSize: Int)
     disruptor ! Initialized
   }
 
-  def persist[T](msg: AnyRef): Future[Any] = {
-    disruptor ? PersistentEvent(msg.toString, msg)
+  def persist[T](id: String, msg: AnyRef)(successFn: Receive): Unit = {
+    val persisted = disruptor ? PersistentEvent(id, msg)
+    persisted onSuccess successFn
+    persisted onFailure successFn
   }
 
   def receiveCommand: Receive
@@ -88,7 +91,8 @@ abstract class BusinessProcessor(bufSize: Int)
       sender ! Disruptor.Processed(index, id, result)
 
     case Disruptor.Processed(index, "Terminate", Terminate) =>
-      log.info("BusinessProcessor - TERMINATED. Processed: {}, {}", index, counter)
+      log.info("BusinessProcessor - TERMINATED. Processed: {}, {}",
+        index, counter)
       context.system.shutdown
 
     case Disruptor.Processed(index, id, data) =>
