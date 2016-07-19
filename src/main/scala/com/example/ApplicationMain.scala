@@ -14,7 +14,9 @@ object ApplicationMain extends App {
 
   val random = new scala.util.Random
 
-  val businessProcessor = system.actorOf(SampleBusinessProcessor.props, "businessProcessor")
+  val businessProcessor = system.actorOf(
+    SampleBusinessProcessor.props,
+    "businessProcessor")
 
   val futureDisruptor = businessProcessor ? BusinessProcessor.SubscribePublisher
 
@@ -25,11 +27,9 @@ object ApplicationMain extends App {
   }
 
   futureDisruptor onSuccess { case disruptor: ActorRef =>
-    val sampleClient = system.actorOf(SampleClient.props(businessProcessor), "sampleClient")
-//    for (i <- 0 until 10) {
-//      disruptor.tell(PersistentEvent(i.toString, PingMessage(i.toString)), businessProcessor)
-//    }
-//    disruptor.tell(PersistentEvent("TERM", Terminate), businessProcessor)
+    val sampleClient = system.actorOf(
+      SampleClient.props(businessProcessor),
+      "sampleClient")
   }
 
   system.awaitTermination()

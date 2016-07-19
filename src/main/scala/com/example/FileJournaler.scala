@@ -1,6 +1,7 @@
 package com.example
 
-import akka.actor.{Actor, ActorContext, ActorLogging, ActorRef, PoisonPill, Props}
+import akka.actor.{Actor, ActorContext,
+  ActorLogging, ActorRef, PoisonPill, Props}
 import java.io._
 import akka.serialization._
 import java.nio.ByteBuffer
@@ -11,7 +12,9 @@ import org.json4s.jackson.Serialization.{ read => jsread, write }
 import Disruptor._
 import JournalActor._
 
-class FileJournaler(val fileName: String, val formats: Formats) extends Journaler {
+class FileJournaler(val fileName: String, val formats: Formats)
+  extends Journaler
+{
   def init(serialization: Serialization) = {
     new FileJournalerDB(serialization, fileName, formats)
   }
@@ -23,7 +26,8 @@ class FileJournalerDB(
   implicit val formats: Formats)
   extends JournalerDB {
 
-  val outputStream = new BufferedOutputStream(new FileOutputStream(fileName, true))
+  val outputStream = new BufferedOutputStream(
+    new FileOutputStream(fileName, true))
 
   def actor(context: ActorContext) = {
     val inputStream = new BufferedInputStream(new FileInputStream(fileName))
@@ -91,14 +95,22 @@ class FileJournalerActor(
           log.debug("{} = {}", key, (array mkString ", "))
           array foreach { msg =>
             counter += 1
-            if (counter != key) log.info("Key 3 is invalid. {} vs {}", key, counter)
-            disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), context.parent)
+            if (counter != key) {
+              log.info("Key 3 is invalid. {} vs {}", key, counter)
+            }
+            disruptor.tell(
+              PersistentEvent(key.toString, Replayed(msg)),
+              context.parent)
           }
         case msg: AnyRef =>
           log.debug("{} = {}", key, value)
           counter += 1
-          if (counter != key) log.info("Key 4 is invalid. {} vs {}", key, counter)
-          disruptor.tell(PersistentEvent(key.toString, Replayed(msg)), context.parent)
+          if (counter != key) {
+            log.info("Key 4 is invalid. {} vs {}", key, counter)
+          }
+          disruptor.tell(
+            PersistentEvent(key.toString, Replayed(msg)),
+            context.parent)
       }
     }
     if (!iter.hasNext) {
@@ -149,6 +161,6 @@ class FileJournalerDBIterator(
 }
 
 object FileJournaler {
-  def props(serializer: Serializer, inputStream: InputStream, formats: Formats) =
-    Props(new FileJournalerActor(serializer, inputStream, formats))
+  def props(serializer: Serializer, is: InputStream, formats: Formats) =
+    Props(new FileJournalerActor(serializer, is, formats))
 }

@@ -56,7 +56,10 @@ class LevelDBJournalerDB(val serialization: Serialization, val db: DB)
   }
 }
 
-class LevelDBJournalerDBIterator(val serializer: Serializer, val dbIterator: DBIterator) {
+class LevelDBJournalerDBIterator(
+  val serializer: Serializer,
+  val dbIterator: DBIterator)
+{
   def hasNext = dbIterator.hasNext
 
   def read: (Long, AnyRef) = {

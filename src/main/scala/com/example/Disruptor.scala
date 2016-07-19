@@ -2,7 +2,9 @@ package com.example
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 
-class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging {
+class Disruptor(bufSize: Int, testMode: Boolean)
+  extends Actor with ActorLogging
+{
   import Disruptor._
 
   val buffer = new Array[BufferItem](bufSize)
@@ -40,17 +42,20 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
   def events(consumers: Vector[List[Consumer]]): Receive = {
     case data: Command =>
       log.debug("Received command message: {}", data)
-      buffer((indexes.head % bufSize).toInt) = BufferItem(0, sender, data.toString, data)
+      buffer((indexes.head % bufSize).toInt) =
+        BufferItem(0, sender, data.toString, data)
       indexes(0) = indexes.head + 1
       log.debug("{}", data.toString)
       step(1, consumers)
 
     case PersistentEvent(id, Terminate) =>
-      context.become(shutdown(consumers, Some(BufferItem(0, sender, id, Terminate))))
+      context.become(
+        shutdown(consumers, Some(BufferItem(0, sender, id, Terminate))))
 
     case PersistentEvent(id, data) if (indexes.head - bufSize) < indexes.last =>
       seqNr += 1
-      buffer((indexes.head % bufSize).toInt) = BufferItem(seqNr, sender, id, data)
+      buffer((indexes.head % bufSize).toInt) =
+        BufferItem(seqNr, sender, id, data)
       indexes(0) = indexes.head + 1
       log.debug("{}", data.toString)
       step(1, consumers)
@@ -79,38 +84,43 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
     }
   }
 
-  def shutdown(consumers: Vector[List[Consumer]], terminateItem: Option[BufferItem]): Receive = {
+  def shutdown(
+    consumers: Vector[List[Consumer]],
+    terminateItem: Option[BufferItem]): Receive =
+  {
     case Processed(index, id, data) =>
       log.debug("Received processed message: Processed({}, {}), {}",
         index, id, indexes.mkString)
-      consumers.flatten.find { c => c.processingIndex == index && c.actorPath == id } foreach {
-        c =>
-          //log.info("BufferItem: {}", buffer((index % bufSize).toInt))
-          writeBackToBuffer(index, data)
-          c.index = c.processingIndex + 1
-          c.processingIndex = -1L
-          val i = consumers.indexWhere(_.contains(c))
-          val lastIndex = indexes(i)
-          indexes(i) = consumers(i).minBy { _.index }.index
-          stepConsumer(indexes(i - 1), c)
+      consumers.flatten.find { c =>
+        c.processingIndex == index && c.actorPath == id } foreach {
+          c =>
+            //log.info("BufferItem: {}", buffer((index % bufSize).toInt))
+            writeBackToBuffer(index, data)
+            c.index = c.processingIndex + 1
+            c.processingIndex = -1L
+            val i = consumers.indexWhere(_.contains(c))
+            val lastIndex = indexes(i)
+            indexes(i) = consumers(i).minBy { _.index }.index
+            stepConsumer(indexes(i - 1), c)
 
-          if (i < indexes.size - 1) {
-            step(i + 1, consumers)
-          } else {
-            val range = (lastIndex until indexes(i))
-            range.foreach { idx =>
-              val bufferItem = buffer((idx % bufSize).toInt)
-              val processed = Processed(idx, bufferItem.id, bufferItem.data)
-              log.debug("Full processed: {}", processed)
-              bufferItem.sender ! processed
-            }
+            if (i < indexes.size - 1) {
+              step(i + 1, consumers)
+            } else {
+              val range = (lastIndex until indexes(i))
+              range.foreach { idx =>
+                val bufferItem = buffer((idx % bufSize).toInt)
+                val processed = Processed(idx, bufferItem.id, bufferItem.data)
+                log.debug("Full processed: {}", processed)
+                bufferItem.sender ! processed
+              }
 
-            if (indexes(0) == indexes(i)) {
-              terminateItem foreach { bufferItem =>
-                bufferItem.sender ! Processed(indexes(0), bufferItem.id, bufferItem.data)
+              if (indexes(0) == indexes(i)) {
+                terminateItem foreach { bufferItem =>
+                  bufferItem.sender !
+                    Processed(indexes(0), bufferItem.id, bufferItem.data)
+                }
               }
             }
-          }
       }
   }
 
@@ -130,12 +140,19 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
             case _ => (maxIdx - firstIdx) match {
               case 1 => (buffer(firstIdx).data, 1)
               case _ =>
-                val seq = buffer.slice(firstIdx, maxIdx).takeWhile(_.seqNr > 0).map(_.data).toSeq
+                val seq = buffer.slice(firstIdx, maxIdx)
+                  .takeWhile(_.seqNr > 0)
+                  .map(_.data)
+                  .toSeq
                 (seq, seq.size)
             }
           }
           consumer.processingIndex = cIndex + count - 1
-          val process = Process(firstSeqNr, consumer.processingIndex, consumer.actorPath, data)
+          val process = Process(
+            firstSeqNr,
+            consumer.processingIndex,
+            consumer.actorPath,
+            data)
           log.debug("{}", process)
           context.actorSelection(consumer.actorPath) ! process
         }
@@ -153,7 +170,8 @@ class Disruptor(bufSize: Int, testMode: Boolean) extends Actor with ActorLogging
 }
 
 object Disruptor {
-  def props(bufSize: Int, testMode: Boolean = false) = Props(new Disruptor(bufSize, testMode))
+  def props(bufSize: Int, testMode: Boolean = false) =
+    Props(new Disruptor(bufSize, testMode))
 
   sealed trait Message extends AnyRef
   trait Command extends Message
