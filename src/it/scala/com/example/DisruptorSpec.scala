@@ -3,7 +3,8 @@ package com.example
 import akka.actor.ActorSystem
 import akka.actor.{Actor, ActorRef}
 import akka.actor.Props
-import akka.testkit.{ EventFilter, TestActorRef, TestActors, TestKit, TestProbe, ImplicitSender }
+import akka.testkit.{ EventFilter, TestActorRef, TestActors, TestKit,
+  TestProbe, ImplicitSender }
 import org.scalatest.WordSpecLike
 import org.scalatest.Matchers
 import org.scalatest.BeforeAndAfterAll
@@ -14,9 +15,9 @@ import scala.util.Success
 
 import Disruptor._
 
-class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll {
-
+class DisruptorSpec(_system: ActorSystem) extends TestKit(_system)
+  with ImplicitSender with WordSpecLike with Matchers with BeforeAndAfterAll
+{
   def this() = this(ActorSystem("MySpec"))
 
   override def afterAll {

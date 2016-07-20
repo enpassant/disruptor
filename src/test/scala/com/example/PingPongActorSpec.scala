@@ -8,8 +8,9 @@ import org.scalatest.WordSpecLike
 import org.scalatest.Matchers
 import org.scalatest.BeforeAndAfterAll
 
-class PingPongActorSpec(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll {
+class PingPongActorSpec(_system: ActorSystem) extends TestKit(_system)
+  with ImplicitSender with WordSpecLike with Matchers with BeforeAndAfterAll
+{
 
   def this() = this(ActorSystem("MySpec"))
 
@@ -20,7 +21,8 @@ class PingPongActorSpec(_system: ActorSystem) extends TestKit(_system) with Impl
   "A Ping actor" must {
     "send back a Processed on a Process" in {
       val pingActor = system.actorOf(PingActor.props)
-      pingActor ! Disruptor.Process(1, 0, "1", BusinessProcessor.PongMessage("pong"))
+      pingActor !
+        Disruptor.Process(1, 0, "1", BusinessProcessor.PongMessage("pong"))
       expectMsg(Disruptor.Processed(0, "1", None))
     }
   }

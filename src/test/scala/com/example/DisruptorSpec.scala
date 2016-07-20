@@ -3,7 +3,8 @@ package com.example
 import akka.actor.ActorSystem
 import akka.actor.{Actor, ActorRef}
 import akka.actor.Props
-import akka.testkit.{ EventFilter, TestActorRef, TestActors, TestKit, TestProbe, ImplicitSender }
+import akka.testkit.{ EventFilter, TestActorRef, TestActors, TestKit,
+  TestProbe, ImplicitSender }
 import org.scalatest.WordSpecLike
 import org.scalatest.Matchers
 import org.scalatest.BeforeAndAfterAll
@@ -14,8 +15,9 @@ import scala.util.Success
 
 import Disruptor._
 
-class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll {
+class DisruptorSpec(_system: ActorSystem) extends TestKit(_system)
+  with ImplicitSender with WordSpecLike with Matchers with BeforeAndAfterAll
+{
 
   def this() = this(ActorSystem("MySpec"))
 
@@ -57,13 +59,16 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       checkOrder(Array(Consumer(0, ""), consumer3, consumer4, consumer6))
 
       disruptor ! consumer2
-      checkOrder(Array(Consumer(0, ""), consumer2, consumer3, consumer4, consumer6))
+      checkOrder(Array(Consumer(0, ""),
+        consumer2, consumer3, consumer4, consumer6))
 
       disruptor ! consumer1
-      checkOrder(Array(Consumer(0, ""), consumer1, consumer2, consumer3, consumer4, consumer6))
+      checkOrder(Array(Consumer(0, ""),
+        consumer1, consumer2, consumer3, consumer4, consumer6))
 
       disruptor ! consumer5
-      checkOrder(Array(Consumer(0, ""), consumer1, consumer2, consumer3, consumer4, consumer5, consumer6))
+      checkOrder(Array(Consumer(0, ""),
+        consumer1, consumer2, consumer3, consumer4, consumer5, consumer6))
     }
 
     "receive an event and send to process" in {
@@ -126,7 +131,9 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       probe3.expectNoMsg(100.millis)
     }
 
-    "send event to every independent consumers and no others if only one processed" in {
+    "send event to every independent consumers" +
+      "and no others if only one processed" in
+    {
       val disruptor = system.actorOf(props(8))
 
       val (probe1, path1) = addTestProbeConsumer(disruptor, 1)
@@ -159,7 +166,9 @@ class DisruptorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
       probe3.expectMsg(100.millis, Process(1, 0, path2, modifiedData))
     }
 
-    "send event to every independent consumers and when it processed send to next" in {
+    "send event to every independent consumers" +
+      "and when it processed send to next" in
+    {
       val disruptor = system.actorOf(props(8))
 
       val (probe1, path1) = addTestProbeConsumer(disruptor, 1)
